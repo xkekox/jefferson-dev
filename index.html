@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260321g" />
+    <link rel="stylesheet" href="./styles.css?v=20260321i" />
   </head>
   <body>
     <div class="console-shell">
@@ -172,6 +172,156 @@
           </div>
         </section>
 
+        <section class="orders-section">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">Novos pedidos</p>
+              <h3>Cadastro de PI, OC, PCH e itens multi-linha</h3>
+            </div>
+            <p class="section-meta">Suporta pedidos divididos e calcula totais automaticamente.</p>
+          </div>
+
+          <div class="orders-layout">
+            <article class="order-card">
+              <div class="order-card-head">
+                <div>
+                  <p class="dock-kicker">Pedido base</p>
+                  <h4>Identificacao e pagamento</h4>
+                </div>
+                <span id="orderSplitBadge" class="dock-status">Base unica</span>
+              </div>
+
+              <div class="order-grid">
+                <label>
+                  Numero da PI
+                  <input id="orderPi" type="text" placeholder="PI-2026-001" />
+                </label>
+                <label>
+                  Numero da OC
+                  <input id="orderOc" type="text" placeholder="OC-4587" />
+                </label>
+                <label>
+                  Numero da PCH
+                  <input id="orderPch" type="text" placeholder="PCH-123" />
+                </label>
+                <label>
+                  Dividir pedido
+                  <select id="orderSplitCount">
+                    <option value="1">1 pedido</option>
+                    <option value="2">2 pedidos</option>
+                    <option value="3">3 pedidos</option>
+                    <option value="4">4 pedidos</option>
+                  </select>
+                </label>
+                <label>
+                  Percentual de entrada
+                  <select id="orderEntryPercent">
+                    <option value="0">0%</option>
+                    <option value="10">10%</option>
+                    <option value="20">20%</option>
+                    <option value="30" selected>30%</option>
+                    <option value="40">40%</option>
+                    <option value="50">50%</option>
+                    <option value="60">60%</option>
+                  </select>
+                </label>
+                <label>
+                  Tipo de pagamento
+                  <select id="orderPaymentType">
+                    <option value="antes-carregamento">Antes do carregamento</option>
+                    <option value="30-apos-embarque">30 dias apos embarque</option>
+                    <option value="60-apos-embarque">60 dias apos embarque</option>
+                    <option value="saldo-documentos">Saldo contra documentos</option>
+                  </select>
+                </label>
+                <label class="inline-toggle">
+                  <input id="orderPaid" type="checkbox" />
+                  Ja foi pago
+                </label>
+                <label>
+                  Data de pagamento
+                  <input id="orderPaymentDate" type="date" />
+                </label>
+              </div>
+
+              <div class="order-summary-strip">
+                <div>
+                  <span>Total do pedido</span>
+                  <strong id="orderTotalValue">US$ 0.00</strong>
+                </div>
+                <div>
+                  <span>Entrada</span>
+                  <strong id="orderEntryValue">US$ 0.00</strong>
+                </div>
+                <div>
+                  <span>Balance</span>
+                  <strong id="orderBalanceValue">US$ 0.00</strong>
+                </div>
+              </div>
+
+              <div class="order-actions">
+                <button id="addOrderItemButton" class="button-inline" type="button">Adicionar item</button>
+                <button id="saveOrderButton" class="button-primary" type="button">Salvar pedido</button>
+                <button id="clearOrderButton" class="button-secondary" type="button">Limpar pedido</button>
+              </div>
+            </article>
+
+            <article class="order-card order-items-card">
+              <div class="order-card-head">
+                <div>
+                  <p class="dock-kicker">Itens do pedido</p>
+                  <h4>Produtos, quantidade e preco</h4>
+                </div>
+                <span class="dock-status">Multi-item</span>
+              </div>
+
+              <div class="table-shell order-table-shell">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Tipo</th>
+                      <th>Codigo</th>
+                      <th>Nome</th>
+                      <th>Qtd</th>
+                      <th>US$ unit</th>
+                      <th>Total</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="orderItemsBody"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+          <div class="order-split-preview">
+            <p class="signal-label">Divisao do pedido</p>
+            <strong id="orderSplitPreview">PCH-123-1 / PCH-123-2</strong>
+            <p id="orderSplitHint">O sistema pode gerar pedidos espelhados com sufixo por lote.</p>
+          </div>
+
+          <div class="section-header compact">
+            <div>
+              <p class="section-kicker">Historico de pedidos</p>
+              <h3>Pedidos registrados e consolidados</h3>
+            </div>
+            <p class="section-meta">Pedidos salvos ficam disponiveis para consulta no console.</p>
+          </div>
+
+          <div class="table-shell">
+            <table>
+              <thead id="ordersTableHead"></thead>
+              <tbody id="ordersTableBody">
+                <tr>
+                  <td colspan="10" class="empty-state">
+                    Nenhum pedido registrado ainda.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section class="results-section">
           <div class="section-header">
             <div>
@@ -210,7 +360,7 @@
               <thead id="tableHead"></thead>
               <tbody id="tableBody">
                 <tr>
-                  <td colspan="12" class="empty-state">
+                  <td colspan="14" class="empty-state">
                     Carregue um ou ambos os relatorios para exibir a leitura operacional de Zain.
                   </td>
                 </tr>
@@ -222,6 +372,6 @@
     </div>
 
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-    <script src="./app.js?v=20260321g"></script>
+    <script src="./app.js?v=20260321i"></script>
   </body>
 </html>
