@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260321j" />
+    <link rel="stylesheet" href="./styles.css?v=20260321k" />
   </head>
   <body>
     <div class="console-shell">
@@ -87,6 +87,10 @@
                   <div>
                     <span>Vendas</span>
                     <strong id="dashboardSalesStatus">Aguardando</strong>
+                  </div>
+                  <div>
+                    <span>Banco</span>
+                    <strong id="dashboardDatabaseStatus">Local</strong>
                   </div>
                 </div>
               </article>
@@ -422,6 +426,8 @@
     </div>
 
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-    <script src="./app.js?v=20260321j"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./config.js?v=20260321k"></script>
+    <script src="./app.js?v=20260321k"></script>
   </body>
 </html>
