@@ -42,6 +42,10 @@ const refs = {
   dashboardStockStatus: document.getElementById("dashboardStockStatus"),
   dashboardSalesStatus: document.getElementById("dashboardSalesStatus"),
   dashboardDatabaseStatus: document.getElementById("dashboardDatabaseStatus"),
+  supabaseUrlInput: document.getElementById("supabaseUrlInput"),
+  supabaseAnonKeyInput: document.getElementById("supabaseAnonKeyInput"),
+  saveSupabaseConfigButton: document.getElementById("saveSupabaseConfigButton"),
+  clearSupabaseConfigButton: document.getElementById("clearSupabaseConfigButton"),
   monthsLabel: document.getElementById("monthsLabel"),
   searchInput: document.getElementById("searchInput"),
   riskFilter: document.getElementById("riskFilter"),
@@ -85,7 +89,8 @@ const STORAGE_KEYS = {
   configs: "jefferson-dev-product-configs",
   orders: "jefferson-dev-orders",
   orderDraft: "jefferson-dev-order-draft",
-  activeTab: "jefferson-dev-active-tab"
+  activeTab: "jefferson-dev-active-tab",
+  supabaseConfig: "jefferson-dev-supabase-config"
 };
 
 const PERSISTENCE = {
@@ -325,12 +330,27 @@ function updateDatabaseStatus(label) {
 }
 
 function getSupabaseConfig() {
-  const config = window.__SUPABASE_CONFIG__ || {};
+  const saved = readStorage(STORAGE_KEYS.supabaseConfig, {});
+  const config = { ...(window.__SUPABASE_CONFIG__ || {}), ...saved };
   return {
     url: String(config.url || "").trim(),
     anonKey: String(config.anonKey || "").trim(),
     projectScope: String(config.projectScope || "").trim() || PERSISTENCE.scope
   };
+}
+
+function saveSupabaseConfig(config) {
+  writeStorage(STORAGE_KEYS.supabaseConfig, config);
+}
+
+function renderSupabaseConfigForm() {
+  const config = getSupabaseConfig();
+  if (refs.supabaseUrlInput) {
+    refs.supabaseUrlInput.value = config.url || "";
+  }
+  if (refs.supabaseAnonKeyInput) {
+    refs.supabaseAnonKeyInput.value = config.anonKey || "";
+  }
 }
 
 async function initializePersistence() {
@@ -356,12 +376,50 @@ async function initializePersistence() {
 
     PERSISTENCE.mode = "supabase";
     updateDatabaseStatus("Supabase");
+    renderSupabaseConfigForm();
   } catch (error) {
     console.warn("Supabase indisponivel, mantendo modo local.", error);
     PERSISTENCE.client = null;
     PERSISTENCE.mode = "local";
     updateDatabaseStatus("Local");
+    renderSupabaseConfigForm();
   }
+}
+
+async function reloadPersistentData() {
+  state.productConfigs = await loadProductConfigsFromSupabase();
+  state.savedOrders = await loadOrdersFromSupabase();
+  renderMonitorList();
+  renderTable();
+  renderOrderForm();
+  renderOrderItems();
+  renderOrderTotals();
+  renderSavedOrders();
+}
+
+async function applySupabaseConfig() {
+  const nextConfig = {
+    url: String(refs.supabaseUrlInput?.value || "").trim(),
+    anonKey: String(refs.supabaseAnonKeyInput?.value || "").trim(),
+    projectScope: PERSISTENCE.scope
+  };
+
+  saveSupabaseConfig(nextConfig);
+  await initializePersistence();
+  await reloadPersistentData();
+  setMessage(
+    PERSISTENCE.mode === "supabase" ? "success" : "info",
+    PERSISTENCE.mode === "supabase"
+      ? "Supabase conectado com sucesso."
+      : "Configuracao salva, mas a conexao com o Supabase nao foi validada. Mantido modo local."
+  );
+}
+
+async function clearSupabaseConfig() {
+  saveSupabaseConfig({ url: "", anonKey: "", projectScope: PERSISTENCE.scope });
+  await initializePersistence();
+  await reloadPersistentData();
+  setMessage("info", "Configuracao do Supabase removida. O app voltou para modo local.");
 }
 
 async function loadProductConfigsFromSupabase() {
@@ -1494,6 +1552,12 @@ refs.salesFile.addEventListener("change", () => {
 refs.tabButtons.forEach((button) => {
   button.addEventListener("click", () => setActiveTab(button.dataset.tabTarget));
 });
+refs.saveSupabaseConfigButton?.addEventListener("click", () => {
+  void applySupabaseConfig();
+});
+refs.clearSupabaseConfigButton?.addEventListener("click", () => {
+  void clearSupabaseConfig();
+});
 
 async function initializeApp() {
   resetState();
@@ -1502,6 +1566,7 @@ async function initializeApp() {
   state.savedOrders = await loadOrdersFromSupabase();
   state.orderDraft = orderDraftFromStorage();
   setActiveTab(readStorage(STORAGE_KEYS.activeTab, "dashboard"));
+  renderSupabaseConfigForm();
   renderMonitorList();
   renderOrderForm();
   renderOrderItems();
