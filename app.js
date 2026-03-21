@@ -12,6 +12,8 @@ const state = {
 };
 
 const refs = {
+  tabButtons: Array.from(document.querySelectorAll("[data-tab-target]")),
+  tabPanels: Array.from(document.querySelectorAll("[data-tab-panel]")),
   stockFile: document.getElementById("stockFile"),
   salesFile: document.getElementById("salesFile"),
   stockText: document.getElementById("stockText"),
@@ -37,6 +39,8 @@ const refs = {
   totalStock: document.getElementById("totalStock"),
   currentMonthSales: document.getElementById("currentMonthSales"),
   currentMonthProjection: document.getElementById("currentMonthProjection"),
+  dashboardStockStatus: document.getElementById("dashboardStockStatus"),
+  dashboardSalesStatus: document.getElementById("dashboardSalesStatus"),
   monthsLabel: document.getElementById("monthsLabel"),
   searchInput: document.getElementById("searchInput"),
   riskFilter: document.getElementById("riskFilter"),
@@ -79,7 +83,8 @@ const SALES_ALIASES = {
 const STORAGE_KEYS = {
   configs: "jefferson-dev-product-configs",
   orders: "jefferson-dev-orders",
-  orderDraft: "jefferson-dev-order-draft"
+  orderDraft: "jefferson-dev-order-draft",
+  activeTab: "jefferson-dev-active-tab"
 };
 
 function normalizeKey(value) {
@@ -300,6 +305,16 @@ function writeStorage(key, value) {
   } catch {
     // ignore storage failures
   }
+}
+
+function setActiveTab(tabName) {
+  refs.tabButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.tabTarget === tabName);
+  });
+  refs.tabPanels.forEach((panel) => {
+    panel.classList.toggle("is-active", panel.dataset.tabPanel === tabName);
+  });
+  writeStorage(STORAGE_KEYS.activeTab, tabName);
 }
 
 function moneyUSD(value) {
@@ -935,6 +950,8 @@ function updateSummary() {
   refs.currentMonthSales.textContent = formatInteger(totalCurrentSales);
   refs.currentMonthProjection.textContent = formatInteger(totalProjection);
   refs.monthsLabel.textContent = state.months.map((key) => monthLabel(key)).join(" | ");
+  refs.dashboardStockStatus.textContent = state.stockLoaded ? "Carregado" : "Aguardando";
+  refs.dashboardSalesStatus.textContent = state.salesLoaded ? "Carregado" : "Aguardando";
   renderMonitorList();
 }
 
@@ -1108,6 +1125,8 @@ function resetState() {
 
   setStatus(refs.stockStatus, "Aguardando", false);
   setStatus(refs.salesStatus, "Aguardando", false);
+  refs.dashboardStockStatus.textContent = "Aguardando";
+  refs.dashboardSalesStatus.textContent = "Aguardando";
   setMessage("info", "Carregue um ou ambos os relatorios para montar a visao operacional de Zain na Pichau.");
 
   refs.productCount.textContent = "0";
@@ -1277,11 +1296,15 @@ refs.salesFile.addEventListener("change", () => {
     refs.salesText.value = "";
   }
 });
+refs.tabButtons.forEach((button) => {
+  button.addEventListener("click", () => setActiveTab(button.dataset.tabTarget));
+});
 
 resetState();
 state.productConfigs = readStorage(STORAGE_KEYS.configs, {});
 state.savedOrders = readStorage(STORAGE_KEYS.orders, []);
 state.orderDraft = orderDraftFromStorage();
+setActiveTab(readStorage(STORAGE_KEYS.activeTab, "dashboard"));
 renderMonitorList();
 renderOrderForm();
 renderOrderItems();
