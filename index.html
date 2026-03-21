@@ -96,6 +96,25 @@
               </article>
 
               <article class="dashboard-card">
+                <p class="section-kicker">Supabase</p>
+                <h4>Conexao com banco</h4>
+                <div class="supabase-form">
+                  <label>
+                    URL do projeto
+                    <input id="supabaseUrlInput" type="url" placeholder="https://xxxx.supabase.co" />
+                  </label>
+                  <label>
+                    Anon key
+                    <input id="supabaseAnonKeyInput" type="text" placeholder="Cole a anon key do projeto" />
+                  </label>
+                  <div class="order-actions">
+                    <button id="saveSupabaseConfigButton" class="button-primary" type="button">Conectar banco</button>
+                    <button id="clearSupabaseConfigButton" class="button-secondary" type="button">Voltar local</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="dashboard-card">
                 <p class="section-kicker">Alertas</p>
                 <h4>Resumo de monitoramento</h4>
                 <div class="monitor-summary compact">
