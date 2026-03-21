@@ -507,7 +507,7 @@ function resetState() {
   renderTable();
 }
 
-async function handleProcess(mode = "both") {
+async function handleProcess(mode) {
   try {
     setMessage("info", "Lendo relatorios do ERP do cliente Zain para a operacao de gabinetes...");
     const stockRows = mode === "sales"
@@ -559,6 +559,18 @@ async function handleProcess(mode = "both") {
   }
 }
 
+async function handleProcessStock() {
+  return handleProcess("stock");
+}
+
+async function handleProcessSales() {
+  return handleProcess("sales");
+}
+
+async function handleProcessBoth() {
+  return handleProcess("both");
+}
+
 async function handleExample(kind) {
   try {
     const content = await loadExample(kind);
@@ -577,9 +589,9 @@ async function handleExample(kind) {
   }
 }
 
-refs.processButton.addEventListener("click", handleProcess);
-refs.processStockButton.addEventListener("click", () => handleProcess("stock"));
-refs.processSalesButton.addEventListener("click", () => handleProcess("sales"));
+refs.processButton.addEventListener("click", handleProcessBoth);
+refs.processStockButton.addEventListener("click", handleProcessStock);
+refs.processSalesButton.addEventListener("click", handleProcessSales);
 refs.clearButton.addEventListener("click", resetState);
 refs.searchInput.addEventListener("input", renderTable);
 refs.riskFilter.addEventListener("change", renderTable);
