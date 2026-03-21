@@ -16,6 +16,8 @@ const refs = {
   salesStatus: document.getElementById("salesStatus"),
   stockExampleButton: document.getElementById("stockExampleButton"),
   salesExampleButton: document.getElementById("salesExampleButton"),
+  processStockButton: document.getElementById("processStockButton"),
+  processSalesButton: document.getElementById("processSalesButton"),
   processButton: document.getElementById("processButton"),
   clearButton: document.getElementById("clearButton"),
   messageBox: document.getElementById("messageBox"),
@@ -505,24 +507,32 @@ function resetState() {
   renderTable();
 }
 
-async function handleProcess() {
+async function handleProcess(mode = "both") {
   try {
     setMessage("info", "Lendo relatorios do ERP do cliente Zain para a operacao de gabinetes...");
-    const stockRows = await loadDataset({
-      fileInput: refs.stockFile,
-      textArea: refs.stockText,
-      aliases: STOCK_ALIASES,
-      kind: "estoque"
-    });
-    const salesRows = await loadDataset({
-      fileInput: refs.salesFile,
-      textArea: refs.salesText,
-      aliases: SALES_ALIASES,
-      kind: "vendas"
-    });
+    const stockRows = mode === "sales"
+      ? null
+      : await loadDataset({
+          fileInput: refs.stockFile,
+          textArea: refs.stockText,
+          aliases: STOCK_ALIASES,
+          kind: "estoque"
+        });
+    const salesRows = mode === "stock"
+      ? null
+      : await loadDataset({
+          fileInput: refs.salesFile,
+          textArea: refs.salesText,
+          aliases: SALES_ALIASES,
+          kind: "vendas"
+        });
 
     if (!stockRows && !salesRows) {
-      throw new Error("Carregue pelo menos um relatorio para processar.");
+      throw new Error(mode === "stock"
+        ? "Carregue um relatorio de estoque para processar."
+        : mode === "sales"
+          ? "Carregue um relatorio de vendas para processar."
+          : "Carregue pelo menos um relatorio para processar.");
     }
 
     state.stockRows = stockRows || [];
@@ -568,6 +578,8 @@ async function handleExample(kind) {
 }
 
 refs.processButton.addEventListener("click", handleProcess);
+refs.processStockButton.addEventListener("click", () => handleProcess("stock"));
+refs.processSalesButton.addEventListener("click", () => handleProcess("sales"));
 refs.clearButton.addEventListener("click", resetState);
 refs.searchInput.addEventListener("input", renderTable);
 refs.riskFilter.addEventListener("change", renderTable);
