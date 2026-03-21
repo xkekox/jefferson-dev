@@ -8,6 +8,7 @@ const state = {
   monitoredTerms: [],
   productConfigs: {},
   savedOrders: [],
+  importHistory: [],
   orderDraft: null
 };
 
@@ -33,6 +34,7 @@ const refs = {
   monitoredCount: document.getElementById("monitoredCount"),
   activeAlertCount: document.getElementById("activeAlertCount"),
   ignoredAlertCount: document.getElementById("ignoredAlertCount"),
+  importHistoryBody: document.getElementById("importHistoryBody"),
   tableHead: document.getElementById("tableHead"),
   tableBody: document.getElementById("tableBody"),
   productCount: document.getElementById("productCount"),
@@ -88,6 +90,7 @@ const SALES_ALIASES = {
 const STORAGE_KEYS = {
   configs: "jefferson-dev-product-configs",
   orders: "jefferson-dev-orders",
+  imports: "jefferson-dev-imports",
   orderDraft: "jefferson-dev-order-draft",
   activeTab: "jefferson-dev-active-tab",
   supabaseConfig: "jefferson-dev-supabase-config"
@@ -98,7 +101,8 @@ const PERSISTENCE = {
   mode: "local",
   tables: {
     productConfigs: "zain_product_configs",
-    orders: "zain_orders"
+    orders: "zain_orders",
+    imports: "zain_import_batches"
   },
   scope: "zain-pichau-console"
 };
@@ -389,12 +393,14 @@ async function initializePersistence() {
 async function reloadPersistentData() {
   state.productConfigs = await loadProductConfigsFromSupabase();
   state.savedOrders = await loadOrdersFromSupabase();
+  state.importHistory = await loadImportsFromSupabase();
   renderMonitorList();
   renderTable();
   renderOrderForm();
   renderOrderItems();
   renderOrderTotals();
   renderSavedOrders();
+  renderImportHistory();
 }
 
 async function applySupabaseConfig() {
@@ -489,6 +495,35 @@ async function loadOrdersFromSupabase() {
   return mapped;
 }
 
+async function loadImportsFromSupabase() {
+  if (PERSISTENCE.mode !== "supabase" || !PERSISTENCE.client) {
+    return readStorage(STORAGE_KEYS.imports, []);
+  }
+
+  const { data, error } = await PERSISTENCE.client
+    .from(PERSISTENCE.tables.imports)
+    .select("id, import_type, source_name, row_count, created_at")
+    .eq("project_scope", PERSISTENCE.scope)
+    .order("created_at", { ascending: false })
+    .limit(12);
+
+  if (error) {
+    console.warn("Falha ao carregar importacoes do Supabase.", error);
+    return readStorage(STORAGE_KEYS.imports, []);
+  }
+
+  const mapped = (data || []).map((row) => ({
+    id: row.id,
+    importType: row.import_type,
+    sourceName: row.source_name || "Manual",
+    rowCount: Number(row.row_count || 0),
+    createdAt: row.created_at || ""
+  }));
+
+  writeStorage(STORAGE_KEYS.imports, mapped);
+  return mapped;
+}
+
 async function syncProductConfigToSupabase(code) {
   if (PERSISTENCE.mode !== "supabase" || !PERSISTENCE.client || !code) {
     return;
@@ -554,6 +589,26 @@ async function deleteOrderFromSupabase(orderId) {
 
   if (error) {
     console.warn("Falha ao remover pedido no Supabase.", error);
+  }
+}
+
+async function insertImportBatchToSupabase(batch) {
+  if (PERSISTENCE.mode !== "supabase" || !PERSISTENCE.client) {
+    return;
+  }
+
+  const payload = {
+    id: batch.id,
+    project_scope: PERSISTENCE.scope,
+    import_type: batch.importType,
+    source_name: batch.sourceName,
+    row_count: batch.rowCount,
+    payload: batch.payload
+  };
+
+  const { error } = await PERSISTENCE.client.from(PERSISTENCE.tables.imports).upsert(payload);
+  if (error) {
+    console.warn("Falha ao salvar importacao no Supabase.", error);
   }
 }
 
@@ -642,8 +697,25 @@ function saveOrders() {
   writeStorage(STORAGE_KEYS.orders, state.savedOrders);
 }
 
+function saveImports() {
+  writeStorage(STORAGE_KEYS.imports, state.importHistory);
+}
+
 function formatOrderValue(value) {
   return moneyUSD(Number(value || 0));
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("pt-BR");
 }
 
 function getOrderItems() {
@@ -859,6 +931,32 @@ function renderSavedOrders() {
         <td>${order.paid ? `Pago${order.paymentDate ? ` em ${order.paymentDate}` : ""}` : "Pendente"}</td>
         <td>${(order.splitLabels || []).join("<br />") || "-"}</td>
         <td><button class="button-inline" type="button" data-delete-order="${order.id}">Excluir</button></td>
+      </tr>
+    `)
+    .join("");
+}
+
+function renderImportHistory() {
+  if (!refs.importHistoryBody) {
+    return;
+  }
+
+  if (!state.importHistory.length) {
+    refs.importHistoryBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="empty-state">Nenhuma importacao registrada ainda.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  refs.importHistoryBody.innerHTML = state.importHistory
+    .map((batch) => `
+      <tr>
+        <td>${batch.importType === "estoque" ? "Estoque" : "Vendas"}</td>
+        <td>${batch.sourceName || "Manual"}</td>
+        <td>${formatInteger(batch.rowCount || 0)}</td>
+        <td>${formatDateTime(batch.createdAt)}</td>
       </tr>
     `)
     .join("");
@@ -1357,6 +1455,7 @@ function resetState() {
   state.months = [];
   state.monitoredTerms = [];
   state.productConfigs = {};
+  state.importHistory = [];
   state.orderDraft = emptyOrderDraft();
 
   refs.stockFile.value = "";
@@ -1393,6 +1492,30 @@ function resetState() {
   renderOrderItems();
   renderOrderTotals();
   renderSavedOrders();
+  renderImportHistory();
+}
+
+function createImportBatch(kind, rows, sourceName) {
+  return {
+    id: newId("import"),
+    importType: kind,
+    sourceName: sourceName || "Manual",
+    rowCount: rows.length,
+    createdAt: new Date().toISOString(),
+    payload: rows
+  };
+}
+
+function getSourceName(fileInput, fallbackLabel) {
+  return fileInput.files?.[0]?.name || fallbackLabel;
+}
+
+async function registerImport(kind, rows, sourceName) {
+  const batch = createImportBatch(kind, rows, sourceName);
+  state.importHistory = [batch, ...state.importHistory].slice(0, 12);
+  saveImports();
+  renderImportHistory();
+  await insertImportBatchToSupabase(batch);
 }
 
 async function handleProcess(mode) {
@@ -1440,6 +1563,14 @@ async function handleProcess(mode) {
     processData();
     updateSummary();
     renderTable();
+
+    if (stockRows) {
+      await registerImport("estoque", stockRows, getSourceName(refs.stockFile, "Texto colado"));
+    }
+
+    if (salesRows) {
+      await registerImport("vendas", salesRows, getSourceName(refs.salesFile, "Texto colado"));
+    }
 
     if (stockRows && salesRows) {
       setMessage("success", "Relatorios de estoque e vendas processados com sucesso.");
@@ -1564,6 +1695,7 @@ async function initializeApp() {
   await initializePersistence();
   state.productConfigs = await loadProductConfigsFromSupabase();
   state.savedOrders = await loadOrdersFromSupabase();
+  state.importHistory = await loadImportsFromSupabase();
   state.orderDraft = orderDraftFromStorage();
   setActiveTab(readStorage(STORAGE_KEYS.activeTab, "dashboard"));
   renderSupabaseConfigForm();
@@ -1572,6 +1704,7 @@ async function initializeApp() {
   renderOrderItems();
   renderOrderTotals();
   renderSavedOrders();
+  renderImportHistory();
 }
 
 void initializeApp();
