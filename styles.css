@@ -248,6 +248,10 @@ body::before {
   gap: 16px;
 }
 
+.dashboard-imports-card {
+  grid-column: 1 / -1;
+}
+
 .dashboard-card {
   padding: 20px;
   border-radius: 20px;
@@ -287,6 +291,10 @@ body::before {
 
 .dashboard-message-card .message-box {
   margin-top: 0;
+}
+
+.compact-table-shell table {
+  min-width: 0;
 }
 
 .supabase-form {
