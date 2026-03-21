@@ -407,10 +407,19 @@ button {
   color: #110c08;
 }
 
+.button-primary.alt {
+  background: linear-gradient(135deg, #ff8e2b, #ffb26a);
+}
+
 .button-secondary {
   background: transparent;
   color: var(--text);
   border: 1px solid var(--line);
+}
+
+.button-secondary.strong {
+  border-color: rgba(255, 106, 0, 0.24);
+  background: rgba(255, 106, 0, 0.08);
 }
 
 .message-box {
