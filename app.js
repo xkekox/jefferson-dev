@@ -4,7 +4,9 @@ const state = {
   stockLoaded: false,
   salesLoaded: false,
   processed: [],
-  months: []
+  months: [],
+  monitoredTerms: [],
+  productConfigs: {}
 };
 
 const refs = {
@@ -21,6 +23,7 @@ const refs = {
   processButton: document.getElementById("processButton"),
   clearButton: document.getElementById("clearButton"),
   messageBox: document.getElementById("messageBox"),
+  monitoredInput: document.getElementById("monitoredInput"),
   tableHead: document.getElementById("tableHead"),
   tableBody: document.getElementById("tableBody"),
   productCount: document.getElementById("productCount"),
@@ -106,6 +109,7 @@ function parseDelimitedText(text) {
 function findColumn(row, aliases) {
   const entries = Object.keys(row);
   const normalizedAliases = aliases.map((alias) => normalizeKey(alias));
+
   for (const key of entries) {
     const normalized = normalizeKey(key);
     if (normalizedAliases.includes(normalized)) {
@@ -115,6 +119,7 @@ function findColumn(row, aliases) {
       return key;
     }
   }
+
   return null;
 }
 
@@ -247,6 +252,40 @@ function formatDecimal(value) {
   }).format(value);
 }
 
+function getMonitoredTerms() {
+  return refs.monitoredInput.value
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((value) => value.toLowerCase());
+}
+
+function matchesMonitoredTerms(product, terms) {
+  if (!terms.length) {
+    return true;
+  }
+
+  const haystack = `${product.code} ${product.name}`.toLowerCase();
+  return terms.some((term) => haystack.includes(term));
+}
+
+function getProductConfig(code) {
+  return (
+    state.productConfigs[code] || {
+      leadDays: "",
+      ignoreAlert: false,
+      ignoreReason: ""
+    }
+  );
+}
+
+function updateProductConfig(code, patch) {
+  state.productConfigs[code] = {
+    ...getProductConfig(code),
+    ...patch
+  };
+}
+
 async function readTextFile(file) {
   return file.text();
 }
@@ -260,6 +299,7 @@ async function readSpreadsheetFile(file) {
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
   const firstSheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[firstSheetName];
+
   return XLSX.utils.sheet_to_json(sheet, {
     defval: "",
     raw: true
@@ -278,13 +318,17 @@ async function readUploadedFile(file) {
 async function loadDataset({ fileInput, textArea, aliases, kind }) {
   const file = fileInput.files?.[0];
   const pasted = textArea.value.trim();
+
   if (!file && !pasted) {
     return null;
   }
+
   const rows = file ? await readUploadedFile(file) : parseDelimitedText(pasted);
 
   if (!rows.length) {
-    throw new Error(`Nao foi possivel ler o relatorio de ${kind}. Verifique se o arquivo tem cabecalho e ao menos uma linha de dados.`);
+    throw new Error(
+      `Nao foi possivel ler o relatorio de ${kind}. Verifique se o arquivo tem cabecalho e ao menos uma linha de dados.`
+    );
   }
 
   const firstRow = rows[0];
@@ -344,6 +388,7 @@ function processData() {
   const currentMonthKey = monthKeys[2];
   const businessDaysElapsed = countBusinessDaysElapsed(referenceDate);
   const businessDaysTotal = countBusinessDaysInMonth(referenceDate);
+  const monitoredTerms = getMonitoredTerms();
   const products = new Map();
 
   for (const item of state.stockRows) {
@@ -390,21 +435,35 @@ function processData() {
   }
 
   state.months = monthKeys;
-  state.processed = Array.from(products.values()).map((product) => {
-    const currentSales = product.monthlySales[currentMonthKey] || 0;
-    const projection = (currentSales / businessDaysElapsed) * businessDaysTotal;
-    const coverageDays =
-      projection > 0 ? (product.stock / projection) * businessDaysTotal : Number.POSITIVE_INFINITY;
-    const riskLevel = product.stock === 0 || product.stock < projection ? "risk" : "healthy";
+  state.monitoredTerms = monitoredTerms;
+  state.processed = Array.from(products.values())
+    .filter((product) => matchesMonitoredTerms(product, monitoredTerms))
+    .map((product) => {
+      const config = getProductConfig(product.code);
+      const currentSales = product.monthlySales[currentMonthKey] || 0;
+      const projection = (currentSales / businessDaysElapsed) * businessDaysTotal;
+      const coverageDays =
+        projection > 0 ? (product.stock / projection) * businessDaysTotal : Number.POSITIVE_INFINITY;
+      const riskLevel = product.stock === 0 || product.stock < projection ? "risk" : "healthy";
+      const leadDays = parseNumber(config.leadDays);
+      const reorderAlert =
+        leadDays > 0 &&
+        coverageDays !== Number.POSITIVE_INFINITY &&
+        coverageDays < leadDays &&
+        !config.ignoreAlert;
 
-    return {
-      ...product,
-      currentSales,
-      projection,
-      coverageDays,
-      riskLevel
-    };
-  });
+      return {
+        ...product,
+        currentSales,
+        projection,
+        coverageDays,
+        riskLevel,
+        leadDays,
+        ignoreAlert: Boolean(config.ignoreAlert),
+        ignoreReason: config.ignoreReason || "",
+        reorderAlert
+      };
+    });
 }
 
 function updateSummary() {
@@ -431,7 +490,11 @@ function buildTableHead() {
       <th>${monthLabel(state.months[2])}</th>
       <th>Projecao ${monthLabel(state.months[2])}</th>
       <th>Cobertura em dias</th>
+      <th>Prazo reposicao</th>
       <th>Risco</th>
+      <th>Alerta compra</th>
+      <th>Ignorar alerta</th>
+      <th>Justificativa</th>
     </tr>
   `;
 }
@@ -441,6 +504,12 @@ function buildRow(item) {
     item.coverageDays === Number.POSITIVE_INFINITY ? "Sem consumo" : formatDecimal(item.coverageDays);
   const riskText = item.riskLevel === "risk" ? "Reposicao urgente" : "Cobertura suficiente";
   const riskClass = item.riskLevel === "risk" ? "risk-cell" : "ok-cell";
+  const reorderText = item.reorderAlert
+    ? "Comprar agora"
+    : item.ignoreAlert
+      ? "Ignorado"
+      : "Dentro do prazo";
+  const reorderClass = item.reorderAlert ? "risk-cell" : "ok-cell";
 
   return `
     <tr>
@@ -452,7 +521,41 @@ function buildRow(item) {
       <td>${formatInteger(item.monthlySales[state.months[2]] || 0)}</td>
       <td>${formatInteger(item.projection)}</td>
       <td>${coverage}</td>
+      <td>
+        <input
+          class="table-input"
+          type="number"
+          min="0"
+          step="1"
+          data-config-field="leadDays"
+          data-product-code="${item.code}"
+          value="${item.leadDays || ""}"
+          placeholder="Dias"
+        />
+      </td>
       <td class="${riskClass}">${riskText}</td>
+      <td class="${reorderClass}">${reorderText}</td>
+      <td>
+        <label class="inline-toggle">
+          <input
+            type="checkbox"
+            data-config-field="ignoreAlert"
+            data-product-code="${item.code}"
+            ${item.ignoreAlert ? "checked" : ""}
+          />
+          <span>Ignorar</span>
+        </label>
+      </td>
+      <td>
+        <input
+          class="table-input"
+          type="text"
+          data-config-field="ignoreReason"
+          data-product-code="${item.code}"
+          value="${item.ignoreReason || ""}"
+          placeholder="Ex.: saindo de linha"
+        />
+      </td>
     </tr>
   `;
 }
@@ -472,7 +575,7 @@ function filteredRows() {
   }
 
   if (risk !== "all") {
-    rows = rows.filter((item) => item.riskLevel === risk);
+    rows = rows.filter((item) => item.riskLevel === risk || (risk === "risk" && item.reorderAlert));
   }
 
   rows.sort((left, right) => {
@@ -496,7 +599,7 @@ function renderTable() {
     refs.tableHead.innerHTML = "";
     refs.tableBody.innerHTML = `
       <tr>
-        <td colspan="9" class="empty-state">Nenhum produto consolidado para exibir.</td>
+        <td colspan="13" class="empty-state">Nenhum produto consolidado para exibir.</td>
       </tr>
     `;
     return;
@@ -509,7 +612,7 @@ function renderTable() {
     ? rows.map(buildRow).join("")
     : `
       <tr>
-        <td colspan="9" class="empty-state">Nenhum item encontrado com os filtros atuais.</td>
+        <td colspan="13" class="empty-state">Nenhum item encontrado com os filtros atuais.</td>
       </tr>
     `;
 }
@@ -521,11 +624,14 @@ function resetState() {
   state.salesLoaded = false;
   state.processed = [];
   state.months = [];
+  state.monitoredTerms = [];
+  state.productConfigs = {};
 
   refs.stockFile.value = "";
   refs.salesFile.value = "";
   refs.stockText.value = "";
   refs.salesText.value = "";
+  refs.monitoredInput.value = "";
   refs.searchInput.value = "";
   refs.riskFilter.value = "all";
   refs.sortSelect.value = "projection";
@@ -545,36 +651,42 @@ function resetState() {
 async function handleProcess(mode) {
   try {
     setMessage("info", "Lendo relatorios do ERP do cliente Zain para a operacao de gabinetes...");
-    const stockRows = mode === "sales"
-      ? null
-      : await loadDataset({
-          fileInput: refs.stockFile,
-          textArea: refs.stockText,
-          aliases: STOCK_ALIASES,
-          kind: "estoque"
-        });
-    const salesRows = mode === "stock"
-      ? null
-      : await loadDataset({
-          fileInput: refs.salesFile,
-          textArea: refs.salesText,
-          aliases: SALES_ALIASES,
-          kind: "vendas"
-        });
+
+    const stockRows =
+      mode === "sales"
+        ? null
+        : await loadDataset({
+            fileInput: refs.stockFile,
+            textArea: refs.stockText,
+            aliases: STOCK_ALIASES,
+            kind: "estoque"
+          });
+
+    const salesRows =
+      mode === "stock"
+        ? null
+        : await loadDataset({
+            fileInput: refs.salesFile,
+            textArea: refs.salesText,
+            aliases: SALES_ALIASES,
+            kind: "vendas"
+          });
 
     if (!stockRows && !salesRows) {
-      throw new Error(mode === "stock"
-        ? "Carregue um relatorio de estoque para processar."
-        : mode === "sales"
-          ? "Carregue um relatorio de vendas para processar."
-          : "Carregue pelo menos um relatorio para processar.");
+      throw new Error(
+        mode === "stock"
+          ? "Carregue um relatorio de estoque para processar."
+          : mode === "sales"
+            ? "Carregue um relatorio de vendas para processar."
+            : "Carregue pelo menos um relatorio para processar."
+      );
     }
 
     state.stockRows = stockRows || [];
     state.salesRows = salesRows || [];
-
     state.stockLoaded = Boolean(stockRows);
     state.salesLoaded = Boolean(salesRows);
+
     setStatus(refs.stockStatus, stockRows ? "Carregado" : "Nao carregado", Boolean(stockRows));
     setStatus(refs.salesStatus, salesRows ? "Carregado" : "Nao carregado", Boolean(salesRows));
 
@@ -594,21 +706,22 @@ async function handleProcess(mode) {
   }
 }
 
-async function handleProcessStock() {
+function handleProcessStock() {
   return handleProcess("stock");
 }
 
-async function handleProcessSales() {
+function handleProcessSales() {
   return handleProcess("sales");
 }
 
-async function handleProcessBoth() {
+function handleProcessBoth() {
   return handleProcess("both");
 }
 
 async function handleExample(kind) {
   try {
     const content = await loadExample(kind);
+
     if (kind === "estoque") {
       refs.stockText.value = content;
       refs.stockFile.value = "";
@@ -618,10 +731,33 @@ async function handleExample(kind) {
       refs.salesFile.value = "";
       setStatus(refs.salesStatus, "Exemplo carregado", true);
     }
+
     setMessage("info", `Exemplo de ${kind} carregado. Agora processe os relatorios.`);
   } catch (error) {
     setMessage("error", error.message || `Falha ao carregar exemplo de ${kind}.`);
   }
+}
+
+function reprocessIfLoaded() {
+  if (state.stockRows.length || state.salesRows.length) {
+    processData();
+    updateSummary();
+    renderTable();
+  }
+}
+
+function handleConfigChange(event) {
+  const target = event.target;
+  const code = target.dataset.productCode;
+  const field = target.dataset.configField;
+
+  if (!code || !field) {
+    return;
+  }
+
+  const value = target.type === "checkbox" ? target.checked : target.value;
+  updateProductConfig(code, { [field]: value });
+  reprocessIfLoaded();
 }
 
 refs.processButton.addEventListener("click", handleProcessBoth);
@@ -631,6 +767,13 @@ refs.clearButton.addEventListener("click", resetState);
 refs.searchInput.addEventListener("input", renderTable);
 refs.riskFilter.addEventListener("change", renderTable);
 refs.sortSelect.addEventListener("change", renderTable);
+refs.monitoredInput.addEventListener("input", reprocessIfLoaded);
+refs.tableBody.addEventListener("change", handleConfigChange);
+refs.tableBody.addEventListener("input", (event) => {
+  if (event.target.dataset.configField === "ignoreReason") {
+    handleConfigChange(event);
+  }
+});
 refs.stockExampleButton.addEventListener("click", () => handleExample("estoque"));
 refs.salesExampleButton.addEventListener("click", () => handleExample("vendas"));
 refs.stockFile.addEventListener("change", () => {
