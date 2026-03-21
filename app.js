@@ -41,6 +41,7 @@ const refs = {
   currentMonthProjection: document.getElementById("currentMonthProjection"),
   dashboardStockStatus: document.getElementById("dashboardStockStatus"),
   dashboardSalesStatus: document.getElementById("dashboardSalesStatus"),
+  dashboardDatabaseStatus: document.getElementById("dashboardDatabaseStatus"),
   monthsLabel: document.getElementById("monthsLabel"),
   searchInput: document.getElementById("searchInput"),
   riskFilter: document.getElementById("riskFilter"),
@@ -85,6 +86,16 @@ const STORAGE_KEYS = {
   orders: "jefferson-dev-orders",
   orderDraft: "jefferson-dev-order-draft",
   activeTab: "jefferson-dev-active-tab"
+};
+
+const PERSISTENCE = {
+  client: null,
+  mode: "local",
+  tables: {
+    productConfigs: "zain_product_configs",
+    orders: "zain_orders"
+  },
+  scope: "zain-pichau-console"
 };
 
 function normalizeKey(value) {
@@ -307,6 +318,187 @@ function writeStorage(key, value) {
   }
 }
 
+function updateDatabaseStatus(label) {
+  if (refs.dashboardDatabaseStatus) {
+    refs.dashboardDatabaseStatus.textContent = label;
+  }
+}
+
+function getSupabaseConfig() {
+  const config = window.__SUPABASE_CONFIG__ || {};
+  return {
+    url: String(config.url || "").trim(),
+    anonKey: String(config.anonKey || "").trim(),
+    projectScope: String(config.projectScope || "").trim() || PERSISTENCE.scope
+  };
+}
+
+async function initializePersistence() {
+  const config = getSupabaseConfig();
+  PERSISTENCE.scope = config.projectScope;
+
+  if (!config.url || !config.anonKey || !window.supabase?.createClient) {
+    PERSISTENCE.mode = "local";
+    updateDatabaseStatus("Local");
+    return;
+  }
+
+  try {
+    PERSISTENCE.client = window.supabase.createClient(config.url, config.anonKey);
+    const { error } = await PERSISTENCE.client
+      .from(PERSISTENCE.tables.orders)
+      .select("id", { head: true, count: "exact" })
+      .eq("project_scope", PERSISTENCE.scope);
+
+    if (error) {
+      throw error;
+    }
+
+    PERSISTENCE.mode = "supabase";
+    updateDatabaseStatus("Supabase");
+  } catch (error) {
+    console.warn("Supabase indisponivel, mantendo modo local.", error);
+    PERSISTENCE.client = null;
+    PERSISTENCE.mode = "local";
+    updateDatabaseStatus("Local");
+  }
+}
+
+async function loadProductConfigsFromSupabase() {
+  if (PERSISTENCE.mode !== "supabase" || !PERSISTENCE.client) {
+    return readStorage(STORAGE_KEYS.configs, {});
+  }
+
+  const { data, error } = await PERSISTENCE.client
+    .from(PERSISTENCE.tables.productConfigs)
+    .select("product_code, lead_days, ignore_alert, ignore_reason")
+    .eq("project_scope", PERSISTENCE.scope);
+
+  if (error) {
+    console.warn("Falha ao carregar configuracoes do Supabase.", error);
+    return readStorage(STORAGE_KEYS.configs, {});
+  }
+
+  const mapped = Object.fromEntries(
+    (data || []).map((row) => [
+      row.product_code,
+      {
+        leadDays: row.lead_days ?? "",
+        ignoreAlert: Boolean(row.ignore_alert),
+        ignoreReason: row.ignore_reason || ""
+      }
+    ])
+  );
+
+  writeStorage(STORAGE_KEYS.configs, mapped);
+  return mapped;
+}
+
+async function loadOrdersFromSupabase() {
+  if (PERSISTENCE.mode !== "supabase" || !PERSISTENCE.client) {
+    return readStorage(STORAGE_KEYS.orders, []);
+  }
+
+  const { data, error } = await PERSISTENCE.client
+    .from(PERSISTENCE.tables.orders)
+    .select("*")
+    .eq("project_scope", PERSISTENCE.scope)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.warn("Falha ao carregar pedidos do Supabase.", error);
+    return readStorage(STORAGE_KEYS.orders, []);
+  }
+
+  const mapped = (data || []).map((row) => ({
+    id: row.id,
+    pi: row.pi || "",
+    oc: row.oc || "",
+    pch: row.pch || "",
+    splitCount: Number(row.split_count || 1),
+    splitLabels: Array.isArray(row.split_labels) ? row.split_labels : [],
+    entryPercent: Number(row.entry_percent || 0),
+    paymentType: row.payment_type || "antes-carregamento",
+    paid: Boolean(row.paid),
+    paymentDate: row.payment_date || "",
+    total: Number(row.total || 0),
+    entry: Number(row.entry || 0),
+    balance: Number(row.balance || 0),
+    items: Array.isArray(row.items) ? row.items : []
+  }));
+
+  writeStorage(STORAGE_KEYS.orders, mapped);
+  return mapped;
+}
+
+async function syncProductConfigToSupabase(code) {
+  if (PERSISTENCE.mode !== "supabase" || !PERSISTENCE.client || !code) {
+    return;
+  }
+
+  const config = getProductConfig(code);
+  const payload = {
+    project_scope: PERSISTENCE.scope,
+    product_code: code,
+    lead_days: config.leadDays === "" ? null : Number(config.leadDays) || 0,
+    ignore_alert: Boolean(config.ignoreAlert),
+    ignore_reason: config.ignoreReason || ""
+  };
+
+  const { error } = await PERSISTENCE.client.from(PERSISTENCE.tables.productConfigs).upsert(payload, {
+    onConflict: "project_scope,product_code"
+  });
+
+  if (error) {
+    console.warn("Falha ao salvar configuracao no Supabase.", error);
+  }
+}
+
+async function insertOrderToSupabase(order) {
+  if (PERSISTENCE.mode !== "supabase" || !PERSISTENCE.client) {
+    return;
+  }
+
+  const payload = {
+    id: order.id,
+    project_scope: PERSISTENCE.scope,
+    pi: order.pi,
+    oc: order.oc,
+    pch: order.pch,
+    split_count: order.splitCount,
+    split_labels: order.splitLabels,
+    entry_percent: order.entryPercent,
+    payment_type: order.paymentType,
+    paid: order.paid,
+    payment_date: order.paymentDate || null,
+    total: order.total,
+    entry: order.entry,
+    balance: order.balance,
+    items: order.items
+  };
+
+  const { error } = await PERSISTENCE.client.from(PERSISTENCE.tables.orders).upsert(payload);
+  if (error) {
+    console.warn("Falha ao salvar pedido no Supabase.", error);
+  }
+}
+
+async function deleteOrderFromSupabase(orderId) {
+  if (PERSISTENCE.mode !== "supabase" || !PERSISTENCE.client || !orderId) {
+    return;
+  }
+
+  const { error } = await PERSISTENCE.client
+    .from(PERSISTENCE.tables.orders)
+    .delete()
+    .eq("project_scope", PERSISTENCE.scope)
+    .eq("id", orderId);
+
+  if (error) {
+    console.warn("Falha ao remover pedido no Supabase.", error);
+  }
+}
+
 function setActiveTab(tabName) {
   refs.tabButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.tabTarget === tabName);
@@ -455,6 +647,7 @@ function updateProductConfig(code, patch) {
     ...patch
   };
   saveProductConfigs();
+  void syncProductConfigToSupabase(code);
 }
 
 function renderMonitorList() {
@@ -707,6 +900,7 @@ function saveCurrentOrder() {
 
   state.savedOrders = [order, ...state.savedOrders];
   saveOrders();
+  void insertOrderToSupabase(order);
   renderSavedOrders();
   setMessage("success", `Pedido ${order.pch || order.pi || order.id} salvo com sucesso.`);
   clearOrderDraft();
@@ -749,6 +943,7 @@ function handleOrderTableClick(event) {
   if (button.dataset.deleteOrder) {
     state.savedOrders = state.savedOrders.filter((order) => order.id !== button.dataset.deleteOrder);
     saveOrders();
+    void deleteOrderFromSupabase(button.dataset.deleteOrder);
     renderSavedOrders();
   }
 }
@@ -1300,13 +1495,18 @@ refs.tabButtons.forEach((button) => {
   button.addEventListener("click", () => setActiveTab(button.dataset.tabTarget));
 });
 
-resetState();
-state.productConfigs = readStorage(STORAGE_KEYS.configs, {});
-state.savedOrders = readStorage(STORAGE_KEYS.orders, []);
-state.orderDraft = orderDraftFromStorage();
-setActiveTab(readStorage(STORAGE_KEYS.activeTab, "dashboard"));
-renderMonitorList();
-renderOrderForm();
-renderOrderItems();
-renderOrderTotals();
-renderSavedOrders();
+async function initializeApp() {
+  resetState();
+  await initializePersistence();
+  state.productConfigs = await loadProductConfigsFromSupabase();
+  state.savedOrders = await loadOrdersFromSupabase();
+  state.orderDraft = orderDraftFromStorage();
+  setActiveTab(readStorage(STORAGE_KEYS.activeTab, "dashboard"));
+  renderMonitorList();
+  renderOrderForm();
+  renderOrderItems();
+  renderOrderTotals();
+  renderSavedOrders();
+}
+
+void initializeApp();
