@@ -242,7 +242,7 @@ async function loadDataset({ fileInput, textArea, aliases, kind }) {
   const file = fileInput.files?.[0];
   const pasted = textArea.value.trim();
   if (!file && !pasted) {
-    throw new Error(`Carregue ou cole o relatorio de ${kind}.`);
+    return null;
   }
   const rows = file ? await readUploadedFile(file) : parseDelimitedText(pasted);
 
@@ -495,7 +495,7 @@ function resetState() {
 
   setStatus(refs.stockStatus, "Aguardando", false);
   setStatus(refs.salesStatus, "Aguardando", false);
-  setMessage("info", "Carregue os dois relatorios para montar a visao operacional de Zain na Pichau.");
+  setMessage("info", "Carregue um ou ambos os relatorios para montar a visao operacional de Zain na Pichau.");
 
   refs.productCount.textContent = "0";
   refs.totalStock.textContent = "0";
@@ -508,29 +508,42 @@ function resetState() {
 async function handleProcess() {
   try {
     setMessage("info", "Lendo relatorios do ERP do cliente Zain para a operacao de gabinetes...");
-    state.stockRows = await loadDataset({
+    const stockRows = await loadDataset({
       fileInput: refs.stockFile,
       textArea: refs.stockText,
       aliases: STOCK_ALIASES,
       kind: "estoque"
     });
-    state.salesRows = await loadDataset({
+    const salesRows = await loadDataset({
       fileInput: refs.salesFile,
       textArea: refs.salesText,
       aliases: SALES_ALIASES,
       kind: "vendas"
     });
 
-    state.stockLoaded = true;
-    state.salesLoaded = true;
-    setStatus(refs.stockStatus, "Carregado", true);
-    setStatus(refs.salesStatus, "Carregado", true);
+    if (!stockRows && !salesRows) {
+      throw new Error("Carregue pelo menos um relatorio para processar.");
+    }
+
+    state.stockRows = stockRows || [];
+    state.salesRows = salesRows || [];
+
+    state.stockLoaded = Boolean(stockRows);
+    state.salesLoaded = Boolean(salesRows);
+    setStatus(refs.stockStatus, stockRows ? "Carregado" : "Nao carregado", Boolean(stockRows));
+    setStatus(refs.salesStatus, salesRows ? "Carregado" : "Nao carregado", Boolean(salesRows));
 
     processData();
     updateSummary();
     renderTable();
 
-    setMessage("success", "Relatorios processados com sucesso para o painel operacional do cliente Zain.");
+    if (stockRows && salesRows) {
+      setMessage("success", "Relatorios de estoque e vendas processados com sucesso.");
+    } else if (stockRows) {
+      setMessage("success", "Relatorio de estoque processado com sucesso.");
+    } else {
+      setMessage("success", "Relatorio de vendas processado com sucesso.");
+    }
   } catch (error) {
     setMessage("error", error.message || "Falha ao processar os relatorios.");
   }
