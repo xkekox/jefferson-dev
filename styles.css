@@ -283,6 +283,12 @@ body::before {
   padding: 24px;
 }
 
+.control-section {
+  background:
+    linear-gradient(135deg, rgba(255, 106, 0, 0.05), transparent 38%),
+    linear-gradient(180deg, rgba(21, 21, 21, 0.96), rgba(12, 12, 12, 0.96));
+}
+
 .section-header {
   display: flex;
   justify-content: space-between;
@@ -300,6 +306,34 @@ body::before {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.control-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 16px;
+}
+
+.control-card {
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(28, 28, 28, 0.96), rgba(18, 18, 18, 0.96));
+}
+
+.helper-copy {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.control-tip {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 106, 0, 0.16);
+  background: rgba(255, 106, 0, 0.08);
+  color: #ffd8c0;
 }
 
 .dock-card {
@@ -500,6 +534,7 @@ td {
   padding: 16px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   text-align: left;
+  vertical-align: top;
 }
 
 th {
@@ -531,6 +566,28 @@ tbody tr:hover {
   text-align: center;
 }
 
+.table-input {
+  min-width: 120px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: #111111;
+  color: var(--text);
+  font: inherit;
+}
+
+.inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text);
+}
+
+.inline-toggle input {
+  accent-color: var(--accent);
+}
+
 @media (max-width: 1220px) {
   .console-shell {
     grid-template-columns: 1fr;
@@ -549,6 +606,7 @@ tbody tr:hover {
   .hero-strip,
   .metrics-grid,
   .import-grid,
+  .control-grid,
   .signal-grid,
   .filters,
   .sidebar {
