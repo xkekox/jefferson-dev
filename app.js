@@ -119,10 +119,38 @@ function findColumn(row, aliases) {
 }
 
 function parseNumber(value) {
-  const normalized = String(value || "")
-    .replace(/\./g, "")
-    .replace(",", ".")
-    .replace(/[^\d.-]/g, "");
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return 0;
+  }
+
+  let normalized = raw.replace(/[^\d,.-]/g, "");
+
+  if (normalized.includes(".") && normalized.includes(",")) {
+    const lastDot = normalized.lastIndexOf(".");
+    const lastComma = normalized.lastIndexOf(",");
+    if (lastComma > lastDot) {
+      normalized = normalized.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalized = normalized.replace(/,/g, "");
+    }
+  } else if (normalized.includes(",")) {
+    const commaMatches = normalized.match(/,/g) || [];
+    normalized =
+      commaMatches.length > 1 || /,\d{3}$/.test(normalized)
+        ? normalized.replace(/,/g, "")
+        : normalized.replace(",", ".");
+  } else if (normalized.includes(".")) {
+    const dotMatches = normalized.match(/\./g) || [];
+    if (dotMatches.length > 1 || /\.\d{3}$/.test(normalized)) {
+      normalized = normalized.replace(/\./g, "");
+    }
+  }
+
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -130,6 +158,13 @@ function parseNumber(value) {
 function parseDate(value) {
   if (!value) {
     return null;
+  }
+
+  if (typeof value === "number" && typeof XLSX !== "undefined") {
+    const excelDate = XLSX.SSF.parse_date_code(value);
+    if (excelDate) {
+      return new Date(excelDate.y, excelDate.m - 1, excelDate.d, 12, 0, 0);
+    }
   }
 
   const raw = String(value).trim();
@@ -227,7 +262,7 @@ async function readSpreadsheetFile(file) {
   const sheet = workbook.Sheets[firstSheetName];
   return XLSX.utils.sheet_to_json(sheet, {
     defval: "",
-    raw: false
+    raw: true
   });
 }
 
