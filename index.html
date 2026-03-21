@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260321f" />
+    <link rel="stylesheet" href="./styles.css?v=20260321g" />
   </head>
   <body>
     <div class="console-shell">
@@ -19,32 +19,12 @@
           <p class="brand-kicker">Pichau Procurement Console</p>
           <h1>Zain</h1>
           <p class="brand-subtitle">Pichau | Compra e venda de gabinetes</p>
+          <div class="brand-inline-meta">
+            <span>Categoria: Gabinetes</span>
+            <span>Modo: Operacao</span>
+            <span>Fonte: ERP</span>
+          </div>
         </div>
-
-        <section class="sidebar-card">
-          <p class="sidebar-label">Leitura principal</p>
-          <strong>Reposicao baseada em giro real</strong>
-          <p>
-            Estoque atual, vendas recentes e projecao mensal reunidos em uma unica visao
-            operacional.
-          </p>
-        </section>
-
-        <section class="sidebar-card">
-          <p class="sidebar-label">Formula da projecao</p>
-          <strong>Venda acumulada / dias uteis corridos x dias uteis do mes</strong>
-          <p>Versao inicial considera segunda a sexta, sem feriados.</p>
-        </section>
-
-        <section class="sidebar-card checklist-card">
-          <p class="sidebar-label">O que entra</p>
-          <ul>
-            <li>Relatorio diario de estoque</li>
-            <li>Relatorio diario de faturamento</li>
-            <li>Giro dos ultimos 3 meses</li>
-            <li>Risco de ruptura</li>
-          </ul>
-        </section>
       </aside>
 
       <main class="workspace">
@@ -55,20 +35,9 @@
           </div>
           <div class="topbar-status">
             <span class="status-dot"></span>
-            MVP operacional
+            Leitura operacional
           </div>
         </header>
-
-        <section class="hero-strip">
-          <div class="hero-copy">
-            <p class="hero-kicker">Filtro, cobertura e reposicao</p>
-            <h3>Ferramenta para identificar o que precisa recomprar e o que pode esperar.</h3>
-          </div>
-          <div class="hero-note">
-            <span>Categoria foco</span>
-            <strong>Gabinetes</strong>
-          </div>
-        </section>
 
         <section class="metrics-grid">
           <article class="metric-card">
@@ -170,31 +139,13 @@
                 <p class="section-kicker">Configuracao por produto</p>
                 <h3>Prazo de reposicao e justificativa de ignorar</h3>
               </div>
-              <p class="section-meta">O prazo e a decisao de ignorar ficam salvos por codigo.</p>
+              <p class="section-meta">Defina o prazo por item e marque excecoes quando necessario.</p>
             </div>
             <div id="monitoredList" class="monitor-list"></div>
             <p id="monitorEmpty" class="monitor-empty">
               Nenhum item monitorado ainda. Preencha a lista acima para priorizar produtos especificos.
             </p>
           </div>
-        </section>
-
-        <section class="signal-grid">
-          <article class="signal-card">
-            <p class="signal-label">Objetivo</p>
-            <strong>Transformar relatorio bruto em criterio de compra</strong>
-            <p>Sem planilha improvisada e sem depender de leitura manual linha por linha.</p>
-          </article>
-          <article class="signal-card">
-            <p class="signal-label">Decisao</p>
-            <strong id="monthsLabel">Ultimos 3 meses ainda nao carregados.</strong>
-            <p>A janela dos ultimos tres meses define o comportamento recente da categoria.</p>
-          </article>
-          <article class="signal-card warning">
-            <p class="signal-label">Prioridade</p>
-            <strong>Identificar ruptura antes de perder venda</strong>
-            <p>Itens com cobertura curta precisam aparecer primeiro para o comprador.</p>
-          </article>
         </section>
 
         <section class="results-section control-section">
@@ -218,18 +169,6 @@
                 Se vazio, o sistema exibe todos os produtos encontrados nos relatorios.
               </p>
             </article>
-
-            <article class="control-card">
-              <p class="signal-label">Como a filtragem funciona</p>
-              <strong>Busca por codigo, SKU ou parte do nome</strong>
-              <p>
-                O sistema cruza os itens digitados com estoque e faturamento e retorna apenas os
-                produtos monitorados.
-              </p>
-              <div class="control-tip">
-                O filtro pode ser preenchido antes ou depois de processar os arquivos.
-              </div>
-            </article>
           </div>
         </section>
 
@@ -237,8 +176,9 @@
           <div class="section-header">
             <div>
               <p class="section-kicker">Consolidacao</p>
-              <h3>Matriz de estoque, giro e cobertura</h3>
+                <h3>Matriz de estoque, giro e cobertura</h3>
             </div>
+            <p id="monthsLabel" class="section-meta">Ultimos 3 meses ainda nao carregados.</p>
           </div>
 
           <div class="filters">
@@ -282,6 +222,6 @@
     </div>
 
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-    <script src="./app.js?v=20260321f"></script>
+    <script src="./app.js?v=20260321g"></script>
   </body>
 </html>
