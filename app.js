@@ -6,7 +6,9 @@ const state = {
   processed: [],
   months: [],
   monitoredTerms: [],
-  productConfigs: {}
+  productConfigs: {},
+  savedOrders: [],
+  orderDraft: null
 };
 
 const refs = {
@@ -24,6 +26,11 @@ const refs = {
   clearButton: document.getElementById("clearButton"),
   messageBox: document.getElementById("messageBox"),
   monitoredInput: document.getElementById("monitoredInput"),
+  monitoredList: document.getElementById("monitoredList"),
+  monitorEmpty: document.getElementById("monitorEmpty"),
+  monitoredCount: document.getElementById("monitoredCount"),
+  activeAlertCount: document.getElementById("activeAlertCount"),
+  ignoredAlertCount: document.getElementById("ignoredAlertCount"),
   tableHead: document.getElementById("tableHead"),
   tableBody: document.getElementById("tableBody"),
   productCount: document.getElementById("productCount"),
@@ -33,7 +40,27 @@ const refs = {
   monthsLabel: document.getElementById("monthsLabel"),
   searchInput: document.getElementById("searchInput"),
   riskFilter: document.getElementById("riskFilter"),
-  sortSelect: document.getElementById("sortSelect")
+  sortSelect: document.getElementById("sortSelect"),
+  orderPi: document.getElementById("orderPi"),
+  orderOc: document.getElementById("orderOc"),
+  orderPch: document.getElementById("orderPch"),
+  orderSplitCount: document.getElementById("orderSplitCount"),
+  orderEntryPercent: document.getElementById("orderEntryPercent"),
+  orderPaymentType: document.getElementById("orderPaymentType"),
+  orderPaid: document.getElementById("orderPaid"),
+  orderPaymentDate: document.getElementById("orderPaymentDate"),
+  orderSplitBadge: document.getElementById("orderSplitBadge"),
+  orderSplitPreview: document.getElementById("orderSplitPreview"),
+  orderSplitHint: document.getElementById("orderSplitHint"),
+  orderTotalValue: document.getElementById("orderTotalValue"),
+  orderEntryValue: document.getElementById("orderEntryValue"),
+  orderBalanceValue: document.getElementById("orderBalanceValue"),
+  orderItemsBody: document.getElementById("orderItemsBody"),
+  addOrderItemButton: document.getElementById("addOrderItemButton"),
+  saveOrderButton: document.getElementById("saveOrderButton"),
+  clearOrderButton: document.getElementById("clearOrderButton"),
+  ordersTableHead: document.getElementById("ordersTableHead"),
+  ordersTableBody: document.getElementById("ordersTableBody")
 };
 
 const STOCK_ALIASES = {
@@ -47,6 +74,12 @@ const SALES_ALIASES = {
   name: ["nome", "descricao", "descrição", "produto", "nome produto", "descricao produto"],
   date: ["data", "data venda", "emissao", "data emissao", "data faturamento"],
   quantity: ["quantidade", "qtd", "qtde", "vendido", "qtd vendida", "quantidade vendida"]
+};
+
+const STORAGE_KEYS = {
+  configs: "jefferson-dev-product-configs",
+  orders: "jefferson-dev-orders",
+  orderDraft: "jefferson-dev-order-draft"
 };
 
 function normalizeKey(value) {
@@ -252,6 +285,128 @@ function formatDecimal(value) {
   }).format(value);
 }
 
+function readStorage(key, fallback) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function moneyUSD(value) {
+  return `US$ ${Number(value || 0).toFixed(2)}`;
+}
+
+function formatPaymentTypeLabel(value) {
+  const labels = {
+    "antes-carregamento": "Antes do carregamento",
+    "30-apos-embarque": "30 dias apos embarque",
+    "60-apos-embarque": "60 dias apos embarque",
+    "saldo-documentos": "Saldo contra documentos"
+  };
+
+  return labels[value] || value || "-";
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function newId(prefix = "item") {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+}
+
+function emptyOrderItem() {
+  return {
+    id: newId("line"),
+    type: "novo",
+    code: "",
+    name: "",
+    quantity: 1,
+    unitPriceUSD: 0
+  };
+}
+
+function emptyOrderDraft() {
+  return {
+    pi: "",
+    oc: "",
+    pch: "",
+    splitCount: "1",
+    entryPercent: "30",
+    paymentType: "antes-carregamento",
+    paid: false,
+    paymentDate: "",
+    items: [emptyOrderItem()]
+  };
+}
+
+function orderDraftFromStorage() {
+  const draft = readStorage(STORAGE_KEYS.orderDraft, null);
+  if (!draft || typeof draft !== "object") {
+    return emptyOrderDraft();
+  }
+
+  return {
+    ...emptyOrderDraft(),
+    ...draft,
+    items: Array.isArray(draft.items) && draft.items.length
+      ? draft.items.map((item) => ({ ...emptyOrderItem(), ...item }))
+      : [emptyOrderItem()]
+  };
+}
+
+function saveOrderDraft() {
+  writeStorage(STORAGE_KEYS.orderDraft, state.orderDraft);
+}
+
+function saveProductConfigs() {
+  writeStorage(STORAGE_KEYS.configs, state.productConfigs);
+}
+
+function saveOrders() {
+  writeStorage(STORAGE_KEYS.orders, state.savedOrders);
+}
+
+function formatOrderValue(value) {
+  return moneyUSD(Number(value || 0));
+}
+
+function getOrderItems() {
+  return state.orderDraft?.items || [];
+}
+
+function computeOrderTotals() {
+  const items = getOrderItems();
+  const total = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPriceUSD) || 0), 0);
+  const entryPercent = Number(state.orderDraft?.entryPercent || 0);
+  const entry = total * (entryPercent / 100);
+  const balance = total - entry;
+  return { total, entry, balance };
+}
+
+function getSplitLabels() {
+  const base = String(state.orderDraft?.pch || "").trim();
+  const splitCount = Math.max(1, Number(state.orderDraft?.splitCount || 1));
+  if (!base) {
+    return [];
+  }
+  return Array.from({ length: splitCount }, (_, index) => `${base}-${index + 1}`);
+}
+
+function syncOrderDraftToStorage() {
+  saveOrderDraft();
+}
+
 function getMonitoredTerms() {
   return refs.monitoredInput.value
     .split(/\r?\n/)
@@ -265,7 +420,7 @@ function matchesMonitoredTerms(product, terms) {
     return true;
   }
 
-  const haystack = `${product.code} ${product.name}`.toLowerCase();
+  const haystack = `${product.code} ${product.sku || ""} ${product.name}`.toLowerCase();
   return terms.some((term) => haystack.includes(term));
 }
 
@@ -284,6 +439,303 @@ function updateProductConfig(code, patch) {
     ...getProductConfig(code),
     ...patch
   };
+  saveProductConfigs();
+}
+
+function renderMonitorList() {
+  const items = state.processed;
+  refs.monitoredCount.textContent = String(items.length);
+  refs.activeAlertCount.textContent = String(items.filter((item) => item.reorderAlert).length);
+  refs.ignoredAlertCount.textContent = String(items.filter((item) => item.ignoreAlert).length);
+  refs.monitorEmpty.hidden = items.length > 0;
+  refs.monitoredList.innerHTML = items.length
+    ? items
+        .map((item) => {
+          const alertClass = item.reorderAlert ? "is-alert" : item.ignoreAlert ? "is-muted" : "is-safe";
+          const alertLabel = item.reorderAlert ? "Comprar agora" : item.ignoreAlert ? "Ignorado" : "Cobertura ok";
+          return `
+            <article class="monitor-card">
+              <div class="monitor-card-head">
+                <div>
+                  <p class="monitor-card-code">${item.code}</p>
+                  <h4>${item.name || "-"}</h4>
+                  <p class="monitor-meta-line">
+                    SKU: ${item.sku || item.code || "-"} | Estoque: ${formatInteger(item.stock)} | Vendas: ${formatInteger(item.currentSales)}
+                  </p>
+                </div>
+                <span class="monitor-badge ${alertClass}">${alertLabel}</span>
+              </div>
+              <div class="monitor-grid">
+                <label>
+                  Prazo de reposicao (dias)
+                  <input
+                    class="table-input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    data-config-field="leadDays"
+                    data-product-code="${item.code}"
+                    value="${item.leadDays || ""}"
+                    placeholder="Dias"
+                  />
+                </label>
+                <label class="inline-toggle">
+                  <input
+                    type="checkbox"
+                    data-config-field="ignoreAlert"
+                    data-product-code="${item.code}"
+                    ${item.ignoreAlert ? "checked" : ""}
+                  />
+                  <span>Ignorar alerta</span>
+                </label>
+                <label class="monitor-note">
+                  Justificativa
+                  <input
+                    class="table-input"
+                    type="text"
+                    data-config-field="ignoreReason"
+                    data-product-code="${item.code}"
+                    value="${item.ignoreReason || ""}"
+                    placeholder="Ex.: pedido em caminho"
+                  />
+                </label>
+              </div>
+            </article>
+          `;
+        })
+        .join("")
+    : "";
+}
+
+function updateOrderHeader() {
+  const splitLabels = getSplitLabels();
+  refs.orderSplitBadge.textContent = splitLabels.length > 1 ? `${splitLabels.length} divisões` : "Base unica";
+  refs.orderSplitPreview.textContent = splitLabels.length ? splitLabels.join(" / ") : "PCH-123-1 / PCH-123-2";
+  refs.orderSplitHint.textContent = splitLabels.length
+    ? "O sistema gera sufixos por pedido separado."
+    : "Informe a PCH para visualizar a divisão."
+}
+
+function renderOrderItems() {
+  refs.orderItemsBody.innerHTML = getOrderItems()
+    .map((item) => {
+      const total = (Number(item.quantity) || 0) * (Number(item.unitPriceUSD) || 0);
+      return `
+        <tr data-item-id="${item.id}">
+          <td>
+            <select data-order-field="type">
+              <option value="novo" ${item.type === "novo" ? "selected" : ""}>Novo</option>
+              <option value="recompra" ${item.type === "recompra" ? "selected" : ""}>Recompra</option>
+            </select>
+          </td>
+          <td><input class="table-input" data-order-field="code" type="text" value="${item.code || ""}" placeholder="Codigo" /></td>
+          <td><input class="table-input" data-order-field="name" type="text" value="${item.name || ""}" placeholder="Nome" /></td>
+          <td><input class="table-input" data-order-field="quantity" type="number" min="1" step="1" value="${item.quantity || 1}" /></td>
+          <td><input class="table-input" data-order-field="unitPriceUSD" type="number" min="0" step="0.01" value="${item.unitPriceUSD || 0}" /></td>
+          <td>${formatOrderValue(total)}</td>
+          <td><button class="button-inline" type="button" data-remove-item="${item.id}">Remover</button></td>
+        </tr>
+      `;
+    })
+    .join("");
+  if (!getOrderItems().length) {
+    refs.orderItemsBody.innerHTML = `
+      <tr>
+        <td colspan="7" class="empty-state">Adicione itens para montar o pedido.</td>
+      </tr>
+    `;
+  }
+}
+
+function renderOrderTotals() {
+  const totals = computeOrderTotals();
+  refs.orderTotalValue.textContent = formatOrderValue(totals.total);
+  refs.orderEntryValue.textContent = formatOrderValue(totals.entry);
+  refs.orderBalanceValue.textContent = formatOrderValue(totals.balance);
+  updateOrderHeader();
+}
+
+function renderSavedOrders() {
+  refs.ordersTableHead.innerHTML = `
+    <tr>
+      <th>Pedido</th>
+      <th>Itens</th>
+      <th>Total</th>
+      <th>Entrada</th>
+      <th>Balance</th>
+      <th>Entrada %</th>
+      <th>Pagamento</th>
+      <th>Status</th>
+      <th>Divisoes</th>
+      <th>Acoes</th>
+    </tr>
+  `;
+  if (!state.savedOrders.length) {
+    refs.ordersTableBody.innerHTML = `
+      <tr>
+        <td colspan="10" class="empty-state">Nenhum pedido registrado ainda.</td>
+      </tr>
+    `;
+    return;
+  }
+  refs.ordersTableBody.innerHTML = state.savedOrders
+    .map((order) => `
+      <tr data-saved-order-id="${order.id}">
+        <td>
+          <strong>${[order.pi, order.oc, order.pch].filter(Boolean).join(" | ") || "-"}</strong>
+        </td>
+        <td>${order.items.map((item) => `${item.code || item.name || "Item"} x${item.quantity}`).join("<br />")}</td>
+        <td>${formatOrderValue(order.total)}</td>
+        <td>${formatOrderValue(order.entry)}</td>
+        <td>${formatOrderValue(order.balance)}</td>
+        <td>${order.entryPercent}%</td>
+        <td>${formatPaymentTypeLabel(order.paymentType)}</td>
+        <td>${order.paid ? `Pago${order.paymentDate ? ` em ${order.paymentDate}` : ""}` : "Pendente"}</td>
+        <td>${(order.splitLabels || []).join("<br />") || "-"}</td>
+        <td><button class="button-inline" type="button" data-delete-order="${order.id}">Excluir</button></td>
+      </tr>
+    `)
+    .join("");
+}
+
+function setOrderDraft(nextDraft) {
+  state.orderDraft = nextDraft;
+  saveOrderDraft();
+  renderOrderForm();
+  renderOrderItems();
+  renderOrderTotals();
+}
+
+function updateOrderDraftField(field, value) {
+  setOrderDraft({
+    ...state.orderDraft,
+    [field]: value
+  });
+}
+
+function updateOrderItem(itemId, field, value) {
+  const items = getOrderItems().map((item) => {
+    if (item.id !== itemId) {
+      return item;
+    }
+
+    return {
+      ...item,
+      [field]: field === "quantity" || field === "unitPriceUSD" ? Number(value) || 0 : value
+    };
+  });
+
+  setOrderDraft({
+    ...state.orderDraft,
+    items
+  });
+}
+
+function addOrderItem() {
+  setOrderDraft({
+    ...state.orderDraft,
+    items: [...getOrderItems(), emptyOrderItem()]
+  });
+}
+
+function removeOrderItem(itemId) {
+  const items = getOrderItems().filter((item) => item.id !== itemId);
+  setOrderDraft({
+    ...state.orderDraft,
+    items: items.length ? items : [emptyOrderItem()]
+  });
+}
+
+function renderOrderForm() {
+  refs.orderPi.value = state.orderDraft.pi || "";
+  refs.orderOc.value = state.orderDraft.oc || "";
+  refs.orderPch.value = state.orderDraft.pch || "";
+  refs.orderSplitCount.value = state.orderDraft.splitCount || "1";
+  refs.orderEntryPercent.value = state.orderDraft.entryPercent || "30";
+  refs.orderPaymentType.value = state.orderDraft.paymentType || "antes-carregamento";
+  refs.orderPaid.checked = Boolean(state.orderDraft.paid);
+  refs.orderPaymentDate.value = state.orderDraft.paymentDate || "";
+}
+
+function saveCurrentOrder() {
+  const items = getOrderItems()
+    .map((item) => ({
+      ...item,
+      quantity: Math.max(1, Number(item.quantity) || 1),
+      unitPriceUSD: Number(item.unitPriceUSD) || 0
+    }))
+    .filter((item) => item.code || item.name);
+
+  if (!items.length) {
+    setMessage("error", "Adicione ao menos um item no pedido.");
+    return;
+  }
+
+  const totals = computeOrderTotals();
+  const splitLabels = getSplitLabels();
+  const order = {
+    id: newId("order"),
+    pi: String(state.orderDraft.pi || "").trim(),
+    oc: String(state.orderDraft.oc || "").trim(),
+    pch: String(state.orderDraft.pch || "").trim(),
+    splitCount: Number(state.orderDraft.splitCount || 1),
+    splitLabels,
+    entryPercent: Number(state.orderDraft.entryPercent || 0),
+    paymentType: state.orderDraft.paymentType,
+    paid: Boolean(state.orderDraft.paid),
+    paymentDate: String(state.orderDraft.paymentDate || "").trim() || (state.orderDraft.paid ? todayISO() : ""),
+    total: totals.total,
+    entry: totals.entry,
+    balance: totals.balance,
+    items
+  };
+
+  state.savedOrders = [order, ...state.savedOrders];
+  saveOrders();
+  renderSavedOrders();
+  setMessage("success", `Pedido ${order.pch || order.pi || order.id} salvo com sucesso.`);
+  clearOrderDraft();
+}
+
+function clearOrderDraft() {
+  setOrderDraft(emptyOrderDraft());
+}
+
+function handleOrderFieldChange(event) {
+  const target = event.target;
+  const itemRow = target.closest("tr[data-item-id]");
+  const orderField = target.dataset.orderField;
+
+  if (itemRow && orderField) {
+    updateOrderItem(itemRow.dataset.itemId, orderField, target.value);
+    return;
+  }
+
+  if (target === refs.orderPi) updateOrderDraftField("pi", target.value);
+  if (target === refs.orderOc) updateOrderDraftField("oc", target.value);
+  if (target === refs.orderPch) updateOrderDraftField("pch", target.value);
+  if (target === refs.orderSplitCount) updateOrderDraftField("splitCount", target.value);
+  if (target === refs.orderEntryPercent) updateOrderDraftField("entryPercent", target.value);
+  if (target === refs.orderPaymentType) updateOrderDraftField("paymentType", target.value);
+  if (target === refs.orderPaid) updateOrderDraftField("paid", target.checked);
+  if (target === refs.orderPaymentDate) updateOrderDraftField("paymentDate", target.value);
+}
+
+function handleOrderTableClick(event) {
+  const button = event.target.closest("[data-remove-item],[data-delete-order]");
+  if (!button) {
+    return;
+  }
+
+  if (button.dataset.removeItem) {
+    removeOrderItem(button.dataset.removeItem);
+  }
+
+  if (button.dataset.deleteOrder) {
+    state.savedOrders = state.savedOrders.filter((order) => order.id !== button.dataset.deleteOrder);
+    saveOrders();
+    renderSavedOrders();
+  }
 }
 
 async function readTextFile(file) {
@@ -399,12 +851,14 @@ function processData() {
 
     const existing = products.get(code) || {
       code,
+      sku: String(item.sku || item.code || "").trim(),
       name: String(item.name || "").trim(),
       stock: 0,
       monthlySales: Object.fromEntries(monthKeys.map((key) => [key, 0]))
     };
 
     existing.name = existing.name || String(item.name || "").trim();
+    existing.sku = existing.sku || String(item.sku || item.code || "").trim();
     existing.stock = parseNumber(item.stock);
     products.set(code, existing);
   }
@@ -424,12 +878,14 @@ function processData() {
 
     const existing = products.get(code) || {
       code,
+      sku: String(sale.sku || sale.code || "").trim(),
       name: String(sale.name || "").trim(),
       stock: 0,
       monthlySales: Object.fromEntries(monthKeys.map((month) => [month, 0]))
     };
 
     existing.name = existing.name || String(sale.name || "").trim();
+    existing.sku = existing.sku || String(sale.sku || sale.code || "").trim();
     existing.monthlySales[key] += parseNumber(sale.quantity);
     products.set(code, existing);
   }
@@ -464,6 +920,8 @@ function processData() {
         reorderAlert
       };
     });
+
+  renderMonitorList();
 }
 
 function updateSummary() {
@@ -477,12 +935,14 @@ function updateSummary() {
   refs.currentMonthSales.textContent = formatInteger(totalCurrentSales);
   refs.currentMonthProjection.textContent = formatInteger(totalProjection);
   refs.monthsLabel.textContent = state.months.map((key) => monthLabel(key)).join(" | ");
+  renderMonitorList();
 }
 
 function buildTableHead() {
   refs.tableHead.innerHTML = `
     <tr>
       <th>Codigo</th>
+      <th>SKU</th>
       <th>Produto</th>
       <th>Estoque atual</th>
       <th>${monthLabel(state.months[0])}</th>
@@ -514,6 +974,7 @@ function buildRow(item) {
   return `
     <tr>
       <td>${item.code}</td>
+      <td>${item.sku || item.code || "-"}</td>
       <td>${item.name || "-"}</td>
       <td>${formatInteger(item.stock)}</td>
       <td>${formatInteger(item.monthlySales[state.months[0]] || 0)}</td>
@@ -569,7 +1030,7 @@ function filteredRows() {
 
   if (search) {
     rows = rows.filter((item) => {
-      const haystack = `${item.code} ${item.name}`.toLowerCase();
+      const haystack = `${item.code} ${item.sku || ""} ${item.name}`.toLowerCase();
       return haystack.includes(search);
     });
   }
@@ -599,7 +1060,7 @@ function renderTable() {
     refs.tableHead.innerHTML = "";
     refs.tableBody.innerHTML = `
       <tr>
-        <td colspan="13" class="empty-state">Nenhum produto consolidado para exibir.</td>
+        <td colspan="14" class="empty-state">Nenhum produto consolidado para exibir.</td>
       </tr>
     `;
     return;
@@ -612,7 +1073,7 @@ function renderTable() {
     ? rows.map(buildRow).join("")
     : `
       <tr>
-        <td colspan="13" class="empty-state">Nenhum item encontrado com os filtros atuais.</td>
+        <td colspan="14" class="empty-state">Nenhum item encontrado com os filtros atuais.</td>
       </tr>
     `;
 }
@@ -626,6 +1087,7 @@ function resetState() {
   state.months = [];
   state.monitoredTerms = [];
   state.productConfigs = {};
+  state.orderDraft = emptyOrderDraft();
 
   refs.stockFile.value = "";
   refs.salesFile.value = "";
@@ -635,6 +1097,14 @@ function resetState() {
   refs.searchInput.value = "";
   refs.riskFilter.value = "all";
   refs.sortSelect.value = "projection";
+  refs.orderPi.value = "";
+  refs.orderOc.value = "";
+  refs.orderPch.value = "";
+  refs.orderSplitCount.value = "1";
+  refs.orderEntryPercent.value = "30";
+  refs.orderPaymentType.value = "antes-carregamento";
+  refs.orderPaid.checked = false;
+  refs.orderPaymentDate.value = "";
 
   setStatus(refs.stockStatus, "Aguardando", false);
   setStatus(refs.salesStatus, "Aguardando", false);
@@ -646,6 +1116,11 @@ function resetState() {
   refs.currentMonthProjection.textContent = "0";
   refs.monthsLabel.textContent = "Ultimos 3 meses ainda nao carregados.";
   renderTable();
+  renderMonitorList();
+  renderOrderForm();
+  renderOrderItems();
+  renderOrderTotals();
+  renderSavedOrders();
 }
 
 async function handleProcess(mode) {
@@ -774,6 +1249,20 @@ refs.tableBody.addEventListener("input", (event) => {
     handleConfigChange(event);
   }
 });
+refs.orderItemsBody.addEventListener("change", handleOrderFieldChange);
+refs.orderItemsBody.addEventListener("input", handleOrderFieldChange);
+refs.orderItemsBody.addEventListener("click", handleOrderTableClick);
+refs.orderPi.addEventListener("input", handleOrderFieldChange);
+refs.orderOc.addEventListener("input", handleOrderFieldChange);
+refs.orderPch.addEventListener("input", handleOrderFieldChange);
+refs.orderSplitCount.addEventListener("change", handleOrderFieldChange);
+refs.orderEntryPercent.addEventListener("change", handleOrderFieldChange);
+refs.orderPaymentType.addEventListener("change", handleOrderFieldChange);
+refs.orderPaid.addEventListener("change", handleOrderFieldChange);
+refs.orderPaymentDate.addEventListener("change", handleOrderFieldChange);
+refs.addOrderItemButton.addEventListener("click", addOrderItem);
+refs.saveOrderButton.addEventListener("click", saveCurrentOrder);
+refs.clearOrderButton.addEventListener("click", clearOrderDraft);
 refs.stockExampleButton.addEventListener("click", () => handleExample("estoque"));
 refs.salesExampleButton.addEventListener("click", () => handleExample("vendas"));
 refs.stockFile.addEventListener("change", () => {
@@ -790,3 +1279,11 @@ refs.salesFile.addEventListener("change", () => {
 });
 
 resetState();
+state.productConfigs = readStorage(STORAGE_KEYS.configs, {});
+state.savedOrders = readStorage(STORAGE_KEYS.orders, []);
+state.orderDraft = orderDraftFromStorage();
+renderMonitorList();
+renderOrderForm();
+renderOrderItems();
+renderOrderTotals();
+renderSavedOrders();
