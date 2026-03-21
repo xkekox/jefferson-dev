@@ -142,6 +142,38 @@ body::before {
   gap: 16px;
 }
 
+.tab-panel {
+  display: none;
+  gap: 16px;
+}
+
+.tab-panel.is-active {
+  display: grid;
+}
+
+.tabs-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tab-button {
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font: inherit;
+  font-weight: 700;
+}
+
+.tab-button.is-active {
+  color: #120d09;
+  border-color: rgba(255, 106, 0, 0.3);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -202,6 +234,58 @@ body::before {
   background:
     linear-gradient(135deg, rgba(255, 106, 0, 0.16), rgba(255, 106, 0, 0.03)),
     linear-gradient(180deg, rgba(21, 21, 21, 0.96), rgba(12, 12, 12, 0.96));
+}
+
+.dashboard-section {
+  display: grid;
+  gap: 20px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 0.95fr 1.15fr 0.9fr;
+  gap: 16px;
+}
+
+.dashboard-card {
+  padding: 20px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(28, 28, 28, 0.96), rgba(18, 18, 18, 0.96));
+}
+
+.dashboard-card h4 {
+  margin: 0 0 16px;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 1.55rem;
+  text-transform: uppercase;
+}
+
+.dashboard-status-list {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-status-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dashboard-status-list span {
+  color: var(--muted);
+}
+
+.dashboard-status-list strong {
+  color: var(--text);
+}
+
+.dashboard-message-card .message-box {
+  margin-top: 0;
 }
 
 .import-section,
@@ -287,6 +371,10 @@ body::before {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin-top: 18px;
+}
+
+.monitor-summary.compact {
+  margin-top: 0;
 }
 
 .monitor-stat span {
@@ -662,6 +750,7 @@ tbody tr:hover {
   }
 
   .metrics-grid,
+  .dashboard-grid,
   .import-grid,
   .monitor-summary,
   .filters,
@@ -690,6 +779,11 @@ tbody tr:hover {
   .results-section,
   .orders-section {
     border-radius: 20px;
+  }
+
+  .tabs-nav {
+    overflow: auto;
+    padding-bottom: 4px;
   }
 
   .brand-panel h1 {
