@@ -13,7 +13,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260322m" />
+    <link rel="stylesheet" href="./styles.css?v=20260322q" />
   </head>
   <body>
     <div class="app-shell">
@@ -37,6 +37,7 @@
           <nav class="tabs-nav" aria-label="Secoes principais">
             <button class="tab-button is-active" type="button" data-tab-target="dashboard">Dashboard</button>
             <button class="tab-button" type="button" data-tab-target="importacao">Importacao</button>
+            <button class="tab-button" type="button" data-tab-target="planilha">Analitico</button>
             <button class="tab-button" type="button" data-tab-target="monitoramento">Monitoramento</button>
             <button class="tab-button" type="button" data-tab-target="pedidos">Pedidos</button>
           </nav>
@@ -300,6 +301,136 @@
           </section>
         </section>
 
+        <section class="tab-panel" data-tab-panel="planilha">
+          <section class="kpi-band">
+            <article class="kpi-card">
+              <span>Linhas lidas</span>
+              <strong id="spreadsheetRowCount">0</strong>
+            </article>
+            <article class="kpi-card">
+              <span>Pedidos unicos</span>
+              <strong id="spreadsheetOrderCount">0</strong>
+            </article>
+            <article class="kpi-card">
+              <span>SKUs na planilha</span>
+              <strong id="spreadsheetSkuCount">0</strong>
+            </article>
+            <article class="kpi-card accent">
+              <span>Total bruto</span>
+              <strong id="spreadsheetGrossTotal">R$ 0,00</strong>
+            </article>
+          </section>
+
+          <section class="dashboard-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Analitico de vendas</p>
+                  <h3>Leitura dedicada do analitico</h3>
+                </div>
+                <span id="spreadsheetStatus" class="panel-badge">Aguardando leitura</span>
+              </div>
+              <p class="panel-meta">
+                Cole a exportacao bruta do ERP ou envie um arquivo para montar a visao analitica de vendas por produto.
+              </p>
+
+              <div class="sheet-input-grid">
+                <article class="dock-card">
+                  <div class="dock-head">
+                    <div>
+                      <p class="eyebrow">Origem</p>
+                      <h4>Arquivo do analitico</h4>
+                    </div>
+                  </div>
+                  <input id="spreadsheetFile" type="file" accept=".xlsx,.xls,.csv,.txt,.pdf,.html,.htm" />
+                  <p class="dock-copy">Suporta Excel, CSV e a exportacao vertical bruta do ERP.</p>
+                </article>
+
+                <article class="dock-card">
+                  <div class="dock-head">
+                    <div>
+                    <p class="eyebrow">Entrada manual</p>
+                      <h4>Cola direta do analitico</h4>
+                    </div>
+                  </div>
+                  <label for="spreadsheetText">Conteudo do analitico</label>
+                  <textarea
+                    id="spreadsheetText"
+                    rows="12"
+                    placeholder="Cole aqui o analitico bruto do ERP com nota, serie, data, pedido, codigo, descricao, margens e demais campos."
+                  ></textarea>
+                </article>
+              </div>
+
+              <div class="action-bar">
+                <button id="processSpreadsheetButton" class="button-primary" type="button">Processar analitico</button>
+                <button id="clearSpreadsheetButton" class="button-secondary" type="button">Limpar analitico</button>
+              </div>
+
+              <pre id="spreadsheetDebug" class="debug-box">Aguardando leitura do analitico.</pre>
+            </article>
+
+            <article class="panel panel-history">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Resumo por produto</p>
+                  <h3>Itens importados do analitico</h3>
+                </div>
+                <span class="panel-badge">Tabela dedicada</span>
+              </div>
+              <div class="table-shell">
+                <table>
+                  <thead id="spreadsheetTableHead">
+                    <tr>
+                      <th>Nota</th>
+                      <th>Série</th>
+                      <th>Data</th>
+                      <th>Pedido</th>
+                      <th>Tipo Mov.</th>
+                      <th>Código</th>
+                      <th>Cód.Empresa</th>
+                      <th>Descrição</th>
+                      <th>Grupo</th>
+                      <th>Subgrupo</th>
+                      <th>Intermediador</th>
+                      <th>Cond.Pgto</th>
+                      <th>Quant.</th>
+                      <th>Valor</th>
+                      <th>Tot.Merc.+IPI</th>
+                      <th>CMV</th>
+                      <th>Margem Ctb</th>
+                      <th>% Mg Ctb</th>
+                      <th>CMV Ger.</th>
+                      <th>Margem Ger</th>
+                      <th>% Mg Ger</th>
+                      <th>Total</th>
+                      <th>Frete</th>
+                      <th>Despesas</th>
+                      <th>Seguro</th>
+                      <th>Valor IPI</th>
+                      <th>Desconto</th>
+                      <th>CFOP</th>
+                      <th>CST Orig.</th>
+                      <th>Estoque</th>
+                      <th>Valor ST</th>
+                      <th>Cód.Cliente</th>
+                      <th>Cliente</th>
+                      <th>Categoria</th>
+                      <th>Marca</th>
+                      <th>Transportadora</th>
+                    </tr>
+                  </thead>
+                  <tbody id="spreadsheetTableBody">
+                    <tr>
+                      <td colspan="36" class="empty-state">Cole a planilha ou envie o arquivo para visualizar os itens importados.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+        </section>
+
         <section class="tab-panel" data-tab-panel="monitoramento">
           <section class="panel">
             <div class="panel-head">
@@ -550,7 +681,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./config.js?v=20260322l"></script>
-    <script src="./app.js?v=20260322l"></script>
+    <script src="./config.js?v=20260322q"></script>
+    <script src="./app.js?v=20260322q"></script>
   </body>
 </html>
