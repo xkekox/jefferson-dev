@@ -245,6 +245,12 @@ input[type="file"] {
   gap: 16px;
 }
 
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 320px));
+  gap: 16px;
+}
+
 .sector-field {
   display: grid;
   gap: 8px;
@@ -278,6 +284,36 @@ input[type="file"] {
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 700;
+}
+
+.grid-brand {
+  grid-template-columns: 0.8fr 1.2fr;
+}
+
+.stats-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #f6f1e8;
+}
+
+.stat-row span {
+  color: var(--muted);
+}
+
+.stat-row strong {
+  color: var(--accent);
+}
+
+.brand-shell table {
+  min-width: 100%;
 }
 
 .table-shell {
@@ -348,7 +384,9 @@ th {
 @media (max-width: 1100px) {
   .grid,
   .upload-grid,
-  .kpi-grid {
+  .kpi-grid,
+  .filter-grid,
+  .grid-brand {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -368,6 +406,8 @@ th {
   .grid,
   .upload-grid,
   .kpi-grid,
+  .filter-grid,
+  .grid-brand,
   .section-head {
     grid-template-columns: 1fr;
     display: grid;
