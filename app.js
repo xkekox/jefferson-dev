@@ -242,12 +242,12 @@ function parseStockTabbedRows(text) {
   const rows = [];
   for (const line of lines) {
     const columns = line.split("\t").map((value) => String(value || "").trim());
-    if (columns.length < 8) {
+    if (columns.length < 4) {
       continue;
     }
 
     const [code, sku, name] = columns;
-    const stock = columns[7];
+    const stock = columns[columns.length - 1];
     const codeLike = /^\d{4,}$/.test(code);
     const skuLike = /[a-z]/i.test(sku) && !/^\d+$/.test(sku);
     const nameLike = /[a-z]/i.test(name) && name.length > 4;
