@@ -270,6 +270,14 @@ input[type="file"] {
   font-size: 14px;
 }
 
+.sector-field input {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fffdf9;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
 .sector-chips {
   display: flex;
   flex-wrap: wrap;
