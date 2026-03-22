@@ -229,6 +229,46 @@ input[type="file"] {
   margin-bottom: 0;
 }
 
+.sector-toolbar {
+  display: grid;
+  gap: 16px;
+}
+
+.sector-field {
+  display: grid;
+  gap: 8px;
+  max-width: 320px;
+}
+
+.sector-field span {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.sector-field select {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fffdf9;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+.sector-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sector-chip {
+  border: 1px solid #cfe2de;
+  background: #f4fbf9;
+  color: #0f4f49;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .table-shell {
   overflow: auto;
   border-radius: 18px;
