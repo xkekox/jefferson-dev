@@ -86,6 +86,31 @@
       <section class="card card-wide">
         <div class="section-head">
           <div>
+            <p class="eyebrow">Filtro de setor</p>
+            <h2>Recorte por categoria operacional</h2>
+          </div>
+          <p class="table-hint">Depois de importar a planilha, cada setor pode filtrar apenas sua linha de produtos.</p>
+        </div>
+        <div class="sector-toolbar">
+          <label class="sector-field">
+            <span>Selecionar setor</span>
+            <select id="sectorFilter">
+              <option value="Todos">Todos</option>
+              <option value="Gabinete">Gabinete</option>
+              <option value="Placa-mae">Placa-mae</option>
+              <option value="Memoria">Memoria</option>
+              <option value="SSD">SSD</option>
+              <option value="Placa de video">Placa de video</option>
+              <option value="Perifericos">Perifericos</option>
+            </select>
+          </label>
+          <div id="sectorChips" class="sector-chips"></div>
+        </div>
+      </section>
+
+      <section class="card card-wide">
+        <div class="section-head">
+          <div>
             <p class="eyebrow">Base consolidada</p>
             <h2>Tabela gerencial inicial</h2>
           </div>
@@ -99,6 +124,7 @@
                 <th>SKU</th>
                 <th>Produto</th>
                 <th>Marca</th>
+                <th>Setor</th>
                 <th>Estoque</th>
                 <th>Reserva</th>
                 <th>Disponivel</th>
@@ -114,7 +140,7 @@
             </thead>
             <tbody id="tableBody">
               <tr>
-                <td colspan="15" class="empty-state">Nenhuma leitura consolidada ainda.</td>
+                <td colspan="16" class="empty-state">Nenhuma leitura consolidada ainda.</td>
               </tr>
             </tbody>
           </table>
