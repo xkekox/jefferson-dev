@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260321l" />
+    <link rel="stylesheet" href="./styles.css?v=20260321m" />
   </head>
   <body>
     <div class="console-shell">
@@ -81,16 +81,16 @@
                 <h4>Status das fontes</h4>
                 <div class="dashboard-status-list">
                   <div>
-                    <span>Estoque</span>
-                    <strong id="dashboardStockStatus">Aguardando</strong>
+                    <span>Ultima leitura de estoque</span>
+                    <strong id="dashboardStockStatus">Sem leitura</strong>
                   </div>
                   <div>
-                    <span>Vendas</span>
-                    <strong id="dashboardSalesStatus">Aguardando</strong>
+                    <span>Ultima leitura de vendas</span>
+                    <strong id="dashboardSalesStatus">Sem leitura</strong>
                   </div>
                   <div>
-                    <span>Banco</span>
-                    <strong id="dashboardDatabaseStatus">Local</strong>
+                    <span>Base persistida</span>
+                    <strong id="dashboardProductBaseCount">0</strong>
                   </div>
                 </div>
               </article>
@@ -449,7 +449,7 @@
 
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./config.js?v=20260321l"></script>
-    <script src="./app.js?v=20260321l"></script>
+    <script src="./config.js?v=20260321m"></script>
+    <script src="./app.js?v=20260321m"></script>
   </body>
 </html>
