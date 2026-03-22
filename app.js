@@ -46,6 +46,35 @@ const SECTOR_RULES = [
   { name: 'Perifericos', keywords: ['mouse', 'teclado', 'headset', 'microfone', 'webcam', 'monitor', 'cadeira', 'controle', 'mousepad'] }
 ];
 
+const BRAND_PATTERNS = [
+  'legion',
+  'pichau',
+  'mancer',
+  'acer',
+  'asus',
+  'aorus',
+  'gigabyte',
+  'msi',
+  'galax',
+  'corsair',
+  'kingston',
+  'hyperx',
+  'crucial',
+  'adata',
+  'xpg',
+  'wd',
+  'western digital',
+  'seagate',
+  'sandisk',
+  'logitech',
+  'redragon',
+  'razer',
+  'lenovo',
+  'intel',
+  'amd',
+  'nvidia'
+];
+
 const MONTH_FORMATTER = new Intl.DateTimeFormat('pt-BR', {
   month: 'short',
   year: '2-digit'
@@ -165,6 +194,70 @@ function findValue(row, aliases) {
   return '';
 }
 
+function sanitizeBrand(value) {
+  const brand = String(value || '').trim();
+  if (!brand) {
+    return '';
+  }
+
+  const normalized = brand
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+  if (!normalized) {
+    return '';
+  }
+
+  if (/^\d+$/.test(normalized)) {
+    return '';
+  }
+
+  if (/^[\d\s./-]+$/.test(normalized)) {
+    return '';
+  }
+
+  return normalized;
+}
+
+function inferBrandFromText(...values) {
+  const source = values
+    .join(' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  const matched = BRAND_PATTERNS.find((pattern) => source.includes(pattern));
+  if (!matched) {
+    return '';
+  }
+
+  if (matched === 'western digital') {
+    return 'Western Digital';
+  }
+
+  if (matched === 'wd') {
+    return 'WD';
+  }
+
+  return matched
+    .split(' ')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function resolveBrand(row, contextValues = []) {
+  const directBrand = sanitizeBrand(
+    findValue(row, ['marca', 'submarca', 'fabricante', 'linha', 'colecao', 'vendor', 'brand'])
+  );
+
+  if (directBrand) {
+    return directBrand;
+  }
+
+  return inferBrandFromText(...contextValues);
+}
+
 async function readFileRows(file) {
   const extension = file.name.split('.').pop().toLowerCase();
 
@@ -254,7 +347,7 @@ function parseStockRows(rows) {
         code,
         sku: String(findValue(row, ['sku', 'referencia'])).trim(),
         name: String(findValue(row, ['nome', 'nome do produto', 'descricao', 'produto'])).trim(),
-        brand: String(findValue(row, ['marca', 'submarca', 'fabricante', 'linha', 'colecao', 'vendor', 'brand'])).trim(),
+        brand: '',
         group: String(findValue(row, ['grupo'])).trim(),
         subgroup: String(findValue(row, ['subgrupo'])).trim(),
         currentStock: toNumber(findValue(row, ['estoque atual', 'estoque fisico', 'estoque', 'saldo'])),
@@ -265,6 +358,19 @@ function parseStockRows(rows) {
         averageSalesHint: toNumber(findValue(row, ['media de venda 3 meses', 'media de venda', 'media 3 meses']))
       };
     })
+    .map((row) => ({
+      ...row,
+      brand: resolveBrand(
+        {
+          marca: row.brand,
+          grupo: row.group,
+          subgrupo: row.subgroup,
+          nome: row.name,
+          sku: row.sku
+        },
+        [row.name, row.group, row.subgroup, row.sku]
+      )
+    }))
     .filter(Boolean);
 }
 
@@ -280,7 +386,11 @@ function parseSalesRows(rows) {
       return {
         code,
         name: String(findValue(row, ['descricao', 'produto', 'nome'])).trim(),
-        brand: String(findValue(row, ['marca', 'submarca', 'fabricante', 'linha', 'colecao', 'vendor', 'brand'])).trim(),
+        brand: resolveBrand(row, [
+          findValue(row, ['descricao', 'produto', 'nome']),
+          findValue(row, ['grupo']),
+          findValue(row, ['subgrupo'])
+        ]),
         group: String(findValue(row, ['grupo'])).trim(),
         subgroup: String(findValue(row, ['subgrupo'])).trim(),
         quantity: toNumber(findValue(row, ['quantidade', 'quant.', 'qtd', 'qtdvendida'])),
@@ -553,7 +663,7 @@ function renderBrandOptions(products) {
 }
 
 function normalizeBrand(value) {
-  const brand = String(value || '').trim();
+  const brand = sanitizeBrand(value);
   return brand || 'Sem marca';
 }
 
