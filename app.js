@@ -842,7 +842,7 @@ function applySearch() {
   state.searchTerm = elements.productSearch.value.trim();
 
   if (!state.searchTerm) {
-    setMessage('Digite um codigo ou SKU para buscar.', 'error');
+    clearSearch({ silent: true });
     return;
   }
 
@@ -864,10 +864,13 @@ function applySearch() {
   render();
 }
 
-function clearSearch() {
+function clearSearch(options = {}) {
+  const { silent = false } = options;
   elements.productSearch.value = '';
   state.searchTerm = '';
-  setMessage('Busca limpa.', 'info');
+  if (!silent) {
+    setMessage('Busca limpa.', 'info');
+  }
   render();
 }
 
@@ -881,6 +884,27 @@ elements.sectorFilter.addEventListener('change', (event) => {
 });
 elements.searchButton.addEventListener('click', () => {
   applySearch();
+});
+elements.productSearch.addEventListener('input', () => {
+  if (!state.products.length) {
+    return;
+  }
+
+  const nextValue = elements.productSearch.value.trim();
+  if (!nextValue) {
+    state.searchTerm = '';
+    render();
+    return;
+  }
+
+  state.searchTerm = nextValue;
+  state.selectedSector = 'Todos';
+  state.selectedBrand = 'Todas';
+  state.selectedSubgroup = 'Todos';
+  elements.sectorFilter.value = 'Todos';
+  elements.brandFilter.value = 'Todas';
+  elements.subgroupFilter.value = 'Todos';
+  render();
 });
 elements.productSearch.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
