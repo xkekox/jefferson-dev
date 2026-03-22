@@ -824,10 +824,50 @@ async function processFiles() {
 function clearAll() {
   elements.stockFile.value = '';
   elements.salesFile.value = '';
+  elements.productSearch.value = '';
   state.stockRows = [];
   state.salesRows = [];
   state.products = [];
+  state.searchTerm = '';
   setMessage('Leitura limpa. Envie novas planilhas para processar.', 'info');
+  render();
+}
+
+function applySearch() {
+  if (!state.products.length) {
+    setMessage('Importe as planilhas antes de buscar por codigo ou SKU.', 'error');
+    return;
+  }
+
+  state.searchTerm = elements.productSearch.value.trim();
+
+  if (!state.searchTerm) {
+    setMessage('Digite um codigo ou SKU para buscar.', 'error');
+    return;
+  }
+
+  state.selectedSector = 'Todos';
+  state.selectedBrand = 'Todas';
+  state.selectedSubgroup = 'Todos';
+  elements.sectorFilter.value = 'Todos';
+  elements.brandFilter.value = 'Todas';
+  elements.subgroupFilter.value = 'Todos';
+
+  const found = getVisibleProducts();
+  if (!found.length) {
+    setMessage(`Nenhum produto encontrado para "${state.searchTerm}".`, 'error');
+    render();
+    return;
+  }
+
+  setMessage(`${found.length} produto(s) encontrado(s) para "${state.searchTerm}".`, 'success');
+  render();
+}
+
+function clearSearch() {
+  elements.productSearch.value = '';
+  state.searchTerm = '';
+  setMessage('Busca limpa.', 'info');
   render();
 }
 
@@ -840,20 +880,16 @@ elements.sectorFilter.addEventListener('change', (event) => {
   render();
 });
 elements.searchButton.addEventListener('click', () => {
-  state.searchTerm = elements.productSearch.value.trim();
-  render();
+  applySearch();
 });
 elements.productSearch.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     event.preventDefault();
-    state.searchTerm = elements.productSearch.value.trim();
-    render();
+    applySearch();
   }
 });
 elements.clearSearchButton.addEventListener('click', () => {
-  elements.productSearch.value = '';
-  state.searchTerm = '';
-  render();
+  clearSearch();
 });
 elements.brandFilter.addEventListener('change', (event) => {
   state.selectedBrand = event.target.value;
@@ -863,5 +899,8 @@ elements.subgroupFilter.addEventListener('change', (event) => {
   state.selectedSubgroup = event.target.value;
   render();
 });
+
+window.__applySearch = applySearch;
+window.__clearSearch = clearSearch;
 
 render();
