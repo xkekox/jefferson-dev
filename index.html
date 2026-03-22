@@ -93,20 +93,74 @@
           <p class="table-hint">Depois de importar a planilha, cada setor pode filtrar apenas sua linha de produtos.</p>
         </div>
         <div class="sector-toolbar">
-          <label class="sector-field">
-            <span>Selecionar setor</span>
-            <select id="sectorFilter">
-              <option value="Todos">Todos</option>
-              <option value="Gabinete">Gabinete</option>
-              <option value="Placa-mae">Placa-mae</option>
-              <option value="Memoria">Memoria</option>
-              <option value="SSD">SSD</option>
-              <option value="Placa de video">Placa de video</option>
-              <option value="Perifericos">Perifericos</option>
-            </select>
-          </label>
+          <div class="filter-grid">
+            <label class="sector-field">
+              <span>Selecionar setor</span>
+              <select id="sectorFilter">
+                <option value="Todos">Todos</option>
+                <option value="Gabinete">Gabinete</option>
+                <option value="Placa-mae">Placa-mae</option>
+                <option value="Memoria">Memoria</option>
+                <option value="SSD">SSD</option>
+                <option value="Placa de video">Placa de video</option>
+                <option value="Perifericos">Perifericos</option>
+              </select>
+            </label>
+            <label class="sector-field">
+              <span>Selecionar marca</span>
+              <select id="brandFilter">
+                <option value="Todas">Todas</option>
+              </select>
+            </label>
+          </div>
           <div id="sectorChips" class="sector-chips"></div>
         </div>
+      </section>
+
+      <section class="grid grid-brand">
+        <article class="card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Resumo do filtro</p>
+              <h2 id="scopeTitle">Totais do recorte atual</h2>
+            </div>
+            <p id="scopeSubtitle" class="table-hint">Os indicadores abaixo seguem o setor e a marca selecionados.</p>
+          </div>
+          <div class="stats-stack">
+            <div class="stat-row"><span>Estoque do recorte</span><strong id="scopeStock">0</strong></div>
+            <div class="stat-row"><span>Venda do mes</span><strong id="scopeCurrentSales">0</strong></div>
+            <div class="stat-row"><span>Projecao do mes</span><strong id="scopeProjection">0</strong></div>
+            <div class="stat-row"><span>Marcas no recorte</span><strong id="scopeBrandCount">0</strong></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Totais por marca</p>
+              <h2>Marcas dentro do setor</h2>
+            </div>
+            <p class="table-hint">Mostra o total dos produtos filtrados e o subtotal de cada marca.</p>
+          </div>
+          <div class="table-shell brand-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>Marca</th>
+                  <th>Produtos</th>
+                  <th>Estoque</th>
+                  <th>Mes atual</th>
+                  <th>Projecao</th>
+                </tr>
+              </thead>
+              <tbody id="brandSummaryBody">
+                <tr>
+                  <td colspan="5" class="empty-state">Importe as planilhas para gerar os totais por marca.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
       </section>
 
       <section class="card card-wide">
