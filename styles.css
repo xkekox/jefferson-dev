@@ -297,11 +297,6 @@ body::before {
   min-width: 0;
 }
 
-.supabase-form {
-  display: grid;
-  gap: 12px;
-}
-
 .import-section,
 .results-section {
   padding: 24px;
