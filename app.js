@@ -1642,11 +1642,8 @@ async function readPdfFile(file) {
     throw new Error("Leitor de PDF indisponivel no momento. Recarregue a pagina e tente novamente.");
   }
 
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.js";
-
   const buffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: buffer, disableWorker: true }).promise;
   const pages = [];
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
@@ -1683,6 +1680,34 @@ async function readPdfFile(file) {
   }
 
   return pages.join("\n");
+}
+
+function htmlToPlainText(text) {
+  if (!/<[a-z][\s\S]*>/i.test(text)) {
+    return text;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, "text/html");
+  const rows = Array.from(doc.querySelectorAll("tr"));
+
+  if (rows.length) {
+    return rows
+      .map((row) =>
+        Array.from(row.querySelectorAll("th,td"))
+          .map((cell) => cell.textContent.trim())
+          .filter(Boolean)
+          .join("\t")
+      )
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  return (doc.body?.innerText || doc.documentElement?.textContent || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n");
 }
 
 function parseStockSpreadsheetByFixedColumns(matrix) {
@@ -1757,7 +1782,15 @@ async function readUploadedFile(file, aliasesByField, kind) {
   if (["xlsx", "xls"].includes(extension)) {
     return readSpreadsheetFile(file, aliasesByField, kind);
   }
-  const text = extension === "pdf" ? await readPdfFile(file) : await readTextFile(file);
+  let text;
+  if (extension === "pdf") {
+    text = await readPdfFile(file);
+  } else {
+    text = await readTextFile(file);
+  }
+  if (["html", "htm"].includes(extension)) {
+    text = htmlToPlainText(text);
+  }
   if (kind === "estoque") {
     const tabbedRows = parseStockTabbedRows(text);
     if (tabbedRows.length) {
@@ -1784,9 +1817,9 @@ async function loadDataset({ fileInput, textArea, aliases, kind }) {
     file
       ? await readUploadedFile(file, aliases, kind)
       : kind === "estoque"
-        ? parseStockTabbedRows(pasted).length
-          ? parseStockTabbedRows(pasted)
-          : parseStockBlockText(pasted)
+        ? parseStockTabbedRows(htmlToPlainText(pasted)).length
+          ? parseStockTabbedRows(htmlToPlainText(pasted))
+          : parseStockBlockText(htmlToPlainText(pasted))
         : parseDelimitedText(pasted);
 
   if (!rows.length) {
