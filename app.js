@@ -5,7 +5,9 @@ const state = {
   selectedSector: 'Todos',
   selectedBrand: 'Todas',
   selectedSubgroup: 'Todos',
-  searchTerm: ''
+  searchTerm: '',
+  searchDraft: '',
+  searchTimer: null
 };
 
 const elements = {
@@ -604,10 +606,18 @@ function render() {
 
   const sectorScopedProducts = getSectorScopedProducts();
   const visibleProducts = getVisibleProducts();
+  const searchMode = Boolean(state.searchTerm);
+
   renderSectorChips(state.products);
-  renderBrandOptions(sectorScopedProducts);
-  renderSubgroupOptions(sectorScopedProducts);
-  renderBrandSummary(sectorScopedProducts, visibleProducts);
+  if (searchMode) {
+    elements.brandSummaryBody.innerHTML =
+      '<tr><td colspan="5" class="empty-state">Busca direta ativa. Resumo lateral simplificado para manter a interface fluida.</td></tr>';
+    updateScopeSummary(visibleProducts, new Set(visibleProducts.map((product) => normalizeBrand(product.brand))).size);
+  } else {
+    renderBrandOptions(sectorScopedProducts);
+    renderSubgroupOptions(sectorScopedProducts);
+    renderBrandSummary(sectorScopedProducts, visibleProducts);
+  }
 
   if (!visibleProducts.length) {
     elements.tableBody.innerHTML =
@@ -840,6 +850,7 @@ function applySearch() {
   }
 
   state.searchTerm = elements.productSearch.value.trim();
+  state.searchDraft = state.searchTerm;
 
   if (!state.searchTerm) {
     clearSearch({ silent: true });
@@ -866,8 +877,13 @@ function applySearch() {
 
 function clearSearch(options = {}) {
   const { silent = false } = options;
+  if (state.searchTimer) {
+    clearTimeout(state.searchTimer);
+    state.searchTimer = null;
+  }
   elements.productSearch.value = '';
   state.searchTerm = '';
+  state.searchDraft = '';
   if (!silent) {
     setMessage('Busca limpa.', 'info');
   }
@@ -891,20 +907,26 @@ elements.productSearch.addEventListener('input', () => {
   }
 
   const nextValue = elements.productSearch.value.trim();
+  state.searchDraft = nextValue;
+
+  if (state.searchTimer) {
+    clearTimeout(state.searchTimer);
+  }
+
   if (!nextValue) {
-    state.searchTerm = '';
-    render();
     return;
   }
 
-  state.searchTerm = nextValue;
-  state.selectedSector = 'Todos';
-  state.selectedBrand = 'Todas';
-  state.selectedSubgroup = 'Todos';
-  elements.sectorFilter.value = 'Todos';
-  elements.brandFilter.value = 'Todas';
-  elements.subgroupFilter.value = 'Todos';
-  render();
+  state.searchTimer = setTimeout(() => {
+    state.searchTerm = state.searchDraft;
+    state.selectedSector = 'Todos';
+    state.selectedBrand = 'Todas';
+    state.selectedSubgroup = 'Todos';
+    elements.sectorFilter.value = 'Todos';
+    elements.brandFilter.value = 'Todas';
+    elements.subgroupFilter.value = 'Todos';
+    render();
+  }, 180);
 });
 elements.productSearch.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
