@@ -612,17 +612,6 @@ async function reloadPersistentData() {
   state.productConfigs = await loadProductConfigsFromSupabase();
   state.savedOrders = await loadOrdersFromSupabase();
   state.importHistory = await loadImportsFromSupabase();
-  const snapshot = loadProcessedSnapshot();
-  const hydrated =
-    hydrateFromImportHistory() ||
-    hydrateFromPersistedProducts() ||
-    (!isSimulatedSnapshot(snapshot) && restoreProcessedSnapshot(snapshot));
-
-  if (hydrated) {
-    saveProcessedSnapshot();
-  } else if (isSimulatedSnapshot(snapshot)) {
-    clearProcessedSnapshot();
-  }
   renderPersistedProductCount();
   renderMonitorList();
   renderTable();
@@ -2356,24 +2345,7 @@ async function initializeApp() {
   renderSavedOrders();
   renderImportHistory();
   renderPersistedProductCount();
-
-  if (hydrateFromImportHistory()) {
-    saveProcessedSnapshot();
-    return;
-  }
-
-  const snapshot = loadProcessedSnapshot();
-  if (!isSimulatedSnapshot(snapshot) && restoreProcessedSnapshot(snapshot)) {
-    return;
-  }
-
-  if (isSimulatedSnapshot(snapshot)) {
-    clearProcessedSnapshot();
-  }
-
-  if (hydrateFromPersistedProducts()) {
-    return;
-  }
+  clearProcessedSnapshot();
 }
 
 void initializeApp();
