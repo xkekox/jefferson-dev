@@ -2412,44 +2412,48 @@ function handleConfigChange(event) {
   reprocessIfLoaded();
 }
 
-refs.processButton.addEventListener("click", handleProcessBoth);
-refs.processStockButton.addEventListener("click", handleProcessStock);
-refs.processSalesButton.addEventListener("click", handleProcessSales);
-refs.clearButton.addEventListener("click", () => resetState({ clearSnapshot: true }));
-refs.searchInput.addEventListener("input", renderTable);
-refs.riskFilter.addEventListener("change", renderTable);
-refs.sortSelect.addEventListener("change", renderTable);
-refs.monitoredInput.addEventListener("input", reprocessIfLoaded);
-refs.tableBody.addEventListener("change", handleConfigChange);
-refs.tableBody.addEventListener("input", (event) => {
+function on(element, eventName, handler) {
+  element?.addEventListener(eventName, handler);
+}
+
+on(refs.processButton, "click", handleProcessBoth);
+on(refs.processStockButton, "click", handleProcessStock);
+on(refs.processSalesButton, "click", handleProcessSales);
+on(refs.clearButton, "click", () => resetState({ clearSnapshot: true }));
+on(refs.searchInput, "input", renderTable);
+on(refs.riskFilter, "change", renderTable);
+on(refs.sortSelect, "change", renderTable);
+on(refs.monitoredInput, "input", reprocessIfLoaded);
+on(refs.tableBody, "change", handleConfigChange);
+on(refs.tableBody, "input", (event) => {
   if (event.target.dataset.configField === "ignoreReason") {
     handleConfigChange(event);
   }
 });
-refs.orderItemsBody.addEventListener("change", handleOrderFieldChange);
-refs.orderItemsBody.addEventListener("input", handleOrderFieldChange);
-refs.orderItemsBody.addEventListener("click", handleOrderTableClick);
-refs.orderPi.addEventListener("input", handleOrderFieldChange);
-refs.orderOc.addEventListener("input", handleOrderFieldChange);
-refs.orderPch.addEventListener("input", handleOrderFieldChange);
-refs.orderSplitCount.addEventListener("change", handleOrderFieldChange);
-refs.orderEntryPercent.addEventListener("change", handleOrderFieldChange);
-refs.orderPaymentType.addEventListener("change", handleOrderFieldChange);
-refs.orderPaid.addEventListener("change", handleOrderFieldChange);
-refs.orderPaymentDate.addEventListener("change", handleOrderFieldChange);
-refs.addOrderItemButton.addEventListener("click", addOrderItem);
-refs.saveOrderButton.addEventListener("click", saveCurrentOrder);
-refs.clearOrderButton.addEventListener("click", clearOrderDraft);
-refs.stockExampleButton.addEventListener("click", () => handleExample("estoque"));
-refs.salesExampleButton.addEventListener("click", () => handleExample("vendas"));
-refs.stockFile.addEventListener("change", () => {
+on(refs.orderItemsBody, "change", handleOrderFieldChange);
+on(refs.orderItemsBody, "input", handleOrderFieldChange);
+on(refs.orderItemsBody, "click", handleOrderTableClick);
+on(refs.orderPi, "input", handleOrderFieldChange);
+on(refs.orderOc, "input", handleOrderFieldChange);
+on(refs.orderPch, "input", handleOrderFieldChange);
+on(refs.orderSplitCount, "change", handleOrderFieldChange);
+on(refs.orderEntryPercent, "change", handleOrderFieldChange);
+on(refs.orderPaymentType, "change", handleOrderFieldChange);
+on(refs.orderPaid, "change", handleOrderFieldChange);
+on(refs.orderPaymentDate, "change", handleOrderFieldChange);
+on(refs.addOrderItemButton, "click", addOrderItem);
+on(refs.saveOrderButton, "click", saveCurrentOrder);
+on(refs.clearOrderButton, "click", clearOrderDraft);
+on(refs.stockExampleButton, "click", () => handleExample("estoque"));
+on(refs.salesExampleButton, "click", () => handleExample("vendas"));
+on(refs.stockFile, "change", () => {
   if (refs.stockFile.files?.[0]) {
     setStatus(refs.stockStatus, refs.stockFile.files[0].name, true);
     refs.stockText.value = "";
     setDashboardSourceStatus("estoque", `${refs.stockFile.files[0].name} - pronto para processar`);
   }
 });
-refs.salesFile.addEventListener("change", () => {
+on(refs.salesFile, "change", () => {
   if (refs.salesFile.files?.[0]) {
     setStatus(refs.salesStatus, refs.salesFile.files[0].name, true);
     refs.salesText.value = "";
@@ -2459,10 +2463,10 @@ refs.salesFile.addEventListener("change", () => {
 refs.tabButtons.forEach((button) => {
   button.addEventListener("click", () => setActiveTab(button.dataset.tabTarget));
 });
-refs.saveSupabaseConfigButton?.addEventListener("click", () => {
+on(refs.saveSupabaseConfigButton, "click", () => {
   void applySupabaseConfig();
 });
-refs.clearSupabaseConfigButton?.addEventListener("click", () => {
+on(refs.clearSupabaseConfigButton, "click", () => {
   void clearSupabaseConfig();
 });
 
@@ -2486,4 +2490,10 @@ async function initializeApp() {
   clearProcessedSnapshot();
 }
 
-void initializeApp();
+window.addEventListener("error", (event) => {
+  setMessage("error", event.message || "Erro ao inicializar a interface.");
+});
+
+void initializeApp().catch((error) => {
+  setMessage("error", error?.message || "Falha ao inicializar a interface.");
+});
