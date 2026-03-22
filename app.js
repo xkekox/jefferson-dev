@@ -194,6 +194,142 @@ function findColumn(row, aliases) {
   return null;
 }
 
+function scoreHeaderMatch(header, aliases) {
+  const normalizedHeader = normalizeKey(header);
+  if (!normalizedHeader) {
+    return 0;
+  }
+
+  let bestScore = 0;
+  for (const alias of aliases) {
+    const normalizedAlias = normalizeKey(alias);
+    if (!normalizedAlias) {
+      continue;
+    }
+
+    if (normalizedHeader === normalizedAlias) {
+      bestScore = Math.max(bestScore, 100);
+      continue;
+    }
+
+    if (normalizedHeader.startsWith(`${normalizedAlias} `) || normalizedHeader.endsWith(` ${normalizedAlias}`)) {
+      bestScore = Math.max(bestScore, 80);
+      continue;
+    }
+
+    if (normalizedHeader.includes(normalizedAlias)) {
+      bestScore = Math.max(bestScore, 65);
+      continue;
+    }
+
+    const aliasTokens = normalizedAlias.split(" ");
+    const headerTokens = normalizedHeader.split(" ");
+    const tokenMatches = aliasTokens.filter((token) => headerTokens.includes(token)).length;
+    if (tokenMatches) {
+      bestScore = Math.max(bestScore, tokenMatches * 20);
+    }
+  }
+
+  return bestScore;
+}
+
+function scoreValueByField(field, value) {
+  if (value == null || value === "") {
+    return 0;
+  }
+
+  if (field === "stock" || field === "quantity") {
+    return parseNumber(value) !== 0 || String(value).trim() === "0" ? 25 : -10;
+  }
+
+  if (field === "date") {
+    return parseDate(value) ? 25 : -15;
+  }
+
+  if (field === "code") {
+    const raw = String(value).trim();
+    if (!raw) {
+      return 0;
+    }
+    return /[a-zA-Z]/.test(raw) || /\d/.test(raw) ? 15 : -10;
+  }
+
+  if (field === "name") {
+    const raw = String(value).trim();
+    if (!raw) {
+      return 0;
+    }
+    return /[a-zA-Z]/.test(raw) ? 15 : -10;
+  }
+
+  return 0;
+}
+
+function findColumnByScore(rows, aliasesByField) {
+  const sampleRows = rows.slice(0, 20);
+  const headers = Object.keys(rows[0] || {});
+  const usedHeaders = new Set();
+  const mapped = {};
+
+  for (const [field, aliases] of Object.entries(aliasesByField)) {
+    let bestHeader = null;
+    let bestScore = -Infinity;
+
+    for (const header of headers) {
+      if (usedHeaders.has(header)) {
+        continue;
+      }
+
+      let score = scoreHeaderMatch(header, aliases);
+      for (const row of sampleRows) {
+        score += scoreValueByField(field, row[header]);
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestHeader = header;
+      }
+    }
+
+    mapped[field] = bestScore > 0 ? bestHeader : null;
+    if (mapped[field]) {
+      usedHeaders.add(mapped[field]);
+    }
+  }
+
+  return mapped;
+}
+
+function scoreHeaderRow(values, aliasesByField) {
+  return Object.values(aliasesByField).reduce((sum, aliases) => {
+    const rowBest = values.reduce((best, value) => Math.max(best, scoreHeaderMatch(value, aliases)), 0);
+    return sum + rowBest;
+  }, 0);
+}
+
+function rowsFromHeaderMatrix(matrix, headerRowIndex) {
+  const headerRow = matrix[headerRowIndex].map((value) => String(value || "").trim());
+  const rows = [];
+
+  for (let index = headerRowIndex + 1; index < matrix.length; index += 1) {
+    const values = matrix[index];
+    if (!values.some((value) => String(value || "").trim())) {
+      continue;
+    }
+
+    const row = {};
+    headerRow.forEach((header, headerIndex) => {
+      if (!header) {
+        return;
+      }
+      row[header] = values[headerIndex] ?? "";
+    });
+    rows.push(row);
+  }
+
+  return rows;
+}
+
 function parseNumber(value) {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : 0;
@@ -1410,7 +1546,7 @@ async function readTextFile(file) {
   return file.text();
 }
 
-async function readSpreadsheetFile(file) {
+async function readSpreadsheetFile(file, aliasesByField) {
   if (typeof XLSX === "undefined") {
     throw new Error("Leitor de Excel indisponivel no momento. Recarregue a pagina e tente novamente.");
   }
@@ -1419,17 +1555,39 @@ async function readSpreadsheetFile(file) {
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
   const firstSheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[firstSheetName];
-
-  return XLSX.utils.sheet_to_json(sheet, {
+  const matrix = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
     defval: "",
     raw: true
   });
+
+  const candidateRows = matrix
+    .map((row, index) => ({ index, row: row.map((value) => String(value || "").trim()) }))
+    .filter(({ row }) => row.some(Boolean))
+    .slice(0, 10);
+
+  if (!candidateRows.length) {
+    return [];
+  }
+
+  let bestHeaderRowIndex = candidateRows[0].index;
+  let bestScore = -Infinity;
+
+  for (const candidate of candidateRows) {
+    const score = scoreHeaderRow(candidate.row, aliasesByField);
+    if (score > bestScore) {
+      bestScore = score;
+      bestHeaderRowIndex = candidate.index;
+    }
+  }
+
+  return rowsFromHeaderMatrix(matrix, bestHeaderRowIndex);
 }
 
-async function readUploadedFile(file) {
+async function readUploadedFile(file, aliasesByField) {
   const extension = (file.name.split(".").pop() || "").toLowerCase();
   if (["xlsx", "xls"].includes(extension)) {
-    return readSpreadsheetFile(file);
+    return readSpreadsheetFile(file, aliasesByField);
   }
   const text = await readTextFile(file);
   return parseDelimitedText(text);
@@ -1443,7 +1601,7 @@ async function loadDataset({ fileInput, textArea, aliases, kind }) {
     return null;
   }
 
-  const rows = file ? await readUploadedFile(file) : parseDelimitedText(pasted);
+  const rows = file ? await readUploadedFile(file, aliases) : parseDelimitedText(pasted);
 
   if (!rows.length) {
     throw new Error(
@@ -1451,10 +1609,7 @@ async function loadDataset({ fileInput, textArea, aliases, kind }) {
     );
   }
 
-  const firstRow = rows[0];
-  const mappedColumns = Object.fromEntries(
-    Object.entries(aliases).map(([field, fieldAliases]) => [field, findColumn(firstRow, fieldAliases)])
-  );
+  const mappedColumns = findColumnByScore(rows, aliases);
 
   const missing = Object.entries(mappedColumns)
     .filter(([, column]) => !column)
