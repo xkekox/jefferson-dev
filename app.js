@@ -1,7 +1,8 @@
 const state = {
   stockRows: [],
   salesRows: [],
-  products: []
+  products: [],
+  selectedSector: 'Todos'
 };
 
 const elements = {
@@ -20,8 +21,19 @@ const elements = {
   kpiCurrentSales: document.getElementById('kpiCurrentSales'),
   kpiProjection: document.getElementById('kpiProjection'),
   kpiNoStock: document.getElementById('kpiNoStock'),
-  kpiLowStock: document.getElementById('kpiLowStock')
+  kpiLowStock: document.getElementById('kpiLowStock'),
+  sectorFilter: document.getElementById('sectorFilter'),
+  sectorChips: document.getElementById('sectorChips')
 };
+
+const SECTOR_RULES = [
+  { name: 'Gabinete', keywords: ['gabinete', 'case', 'chassis'] },
+  { name: 'Placa-mae', keywords: ['placamae', 'placa mae', 'motherboard', 'mb '] },
+  { name: 'Memoria', keywords: ['memoria', 'ram', 'ddr4', 'ddr5'] },
+  { name: 'SSD', keywords: ['ssd', 'nvme', 'm2', 'sata ssd'] },
+  { name: 'Placa de video', keywords: ['placa de video', 'gpu', 'rtx', 'gtx', 'radeon', 'geforce'] },
+  { name: 'Perifericos', keywords: ['mouse', 'teclado', 'headset', 'microfone', 'webcam', 'monitor', 'cadeira', 'controle', 'mousepad'] }
+];
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('pt-BR', {
   month: 'short',
@@ -341,6 +353,7 @@ function consolidateProducts(stockRows, salesRows) {
 
       return {
         ...product,
+        sector: inferSector(product),
         projection,
         averageSales,
         coverage,
@@ -389,6 +402,36 @@ function statusClassName(status) {
   return 'status-normal';
 }
 
+function inferSector(product) {
+  const source = [
+    product.name,
+    product.brand,
+    product.group,
+    product.subgroup,
+    product.sku
+  ]
+    .join(' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  for (const rule of SECTOR_RULES) {
+    if (rule.keywords.some((keyword) => source.includes(keyword))) {
+      return rule.name;
+    }
+  }
+
+  return 'Outros';
+}
+
+function getVisibleProducts() {
+  if (state.selectedSector === 'Todos') {
+    return state.products;
+  }
+
+  return state.products.filter((product) => product.sector === state.selectedSector);
+}
+
 function render() {
   const monthBuckets = getMonthBuckets();
   elements.monthHeader0.textContent = formatMonthLabel(monthBuckets[0]);
@@ -398,12 +441,23 @@ function render() {
 
   if (!state.products.length) {
     elements.tableBody.innerHTML =
-      '<tr><td colspan="15" class="empty-state">Nenhuma leitura consolidada ainda.</td></tr>';
+      '<tr><td colspan="16" class="empty-state">Nenhuma leitura consolidada ainda.</td></tr>';
+    updateKpis([]);
+    renderSectorChips([]);
+    return;
+  }
+
+  const visibleProducts = getVisibleProducts();
+  renderSectorChips(state.products);
+
+  if (!visibleProducts.length) {
+    elements.tableBody.innerHTML =
+      '<tr><td colspan="16" class="empty-state">Nenhum produto encontrado para o setor selecionado.</td></tr>';
     updateKpis([]);
     return;
   }
 
-  elements.tableBody.innerHTML = state.products
+  elements.tableBody.innerHTML = visibleProducts
     .map((product) => {
       return `
         <tr>
@@ -411,6 +465,7 @@ function render() {
           <td>${escapeHtml(product.sku)}</td>
           <td>${escapeHtml(product.name)}</td>
           <td>${escapeHtml(product.brand)}</td>
+          <td>${escapeHtml(product.sector)}</td>
           <td>${formatNumber(product.currentStock)}</td>
           <td>${formatNumber(product.reservedStock)}</td>
           <td>${formatNumber(product.availableStock)}</td>
@@ -427,7 +482,20 @@ function render() {
     })
     .join('');
 
-  updateKpis(state.products);
+  updateKpis(visibleProducts);
+}
+
+function renderSectorChips(products) {
+  const counts = new Map();
+  products.forEach((product) => {
+    counts.set(product.sector, (counts.get(product.sector) || 0) + 1);
+  });
+
+  const ordered = ['Gabinete', 'Placa-mae', 'Memoria', 'SSD', 'Placa de video', 'Perifericos', 'Outros']
+    .filter((sector) => counts.has(sector))
+    .map((sector) => `<span class="sector-chip">${escapeHtml(sector)}: ${formatNumber(counts.get(sector))}</span>`);
+
+  elements.sectorChips.innerHTML = ordered.join('');
 }
 
 function updateKpis(products) {
@@ -509,5 +577,9 @@ function clearAll() {
 
 elements.processButton.addEventListener('click', processFiles);
 elements.clearButton.addEventListener('click', clearAll);
+elements.sectorFilter.addEventListener('change', (event) => {
+  state.selectedSector = event.target.value;
+  render();
+});
 
 render();
