@@ -2,7 +2,8 @@ const state = {
   stockRows: [],
   salesRows: [],
   products: [],
-  selectedSector: 'Todos'
+  selectedSector: 'Todos',
+  selectedBrand: 'Todas'
 };
 
 const elements = {
@@ -23,7 +24,15 @@ const elements = {
   kpiNoStock: document.getElementById('kpiNoStock'),
   kpiLowStock: document.getElementById('kpiLowStock'),
   sectorFilter: document.getElementById('sectorFilter'),
-  sectorChips: document.getElementById('sectorChips')
+  sectorChips: document.getElementById('sectorChips'),
+  brandFilter: document.getElementById('brandFilter'),
+  brandSummaryBody: document.getElementById('brandSummaryBody'),
+  scopeTitle: document.getElementById('scopeTitle'),
+  scopeSubtitle: document.getElementById('scopeSubtitle'),
+  scopeStock: document.getElementById('scopeStock'),
+  scopeCurrentSales: document.getElementById('scopeCurrentSales'),
+  scopeProjection: document.getElementById('scopeProjection'),
+  scopeBrandCount: document.getElementById('scopeBrandCount')
 };
 
 const SECTOR_RULES = [
@@ -425,6 +434,14 @@ function inferSector(product) {
 }
 
 function getVisibleProducts() {
+  return state.products.filter((product) => {
+    const sectorMatch = state.selectedSector === 'Todos' || product.sector === state.selectedSector;
+    const brandMatch = state.selectedBrand === 'Todas' || (product.brand || 'Sem marca') === state.selectedBrand;
+    return sectorMatch && brandMatch;
+  });
+}
+
+function getSectorScopedProducts() {
   if (state.selectedSector === 'Todos') {
     return state.products;
   }
@@ -444,11 +461,16 @@ function render() {
       '<tr><td colspan="16" class="empty-state">Nenhuma leitura consolidada ainda.</td></tr>';
     updateKpis([]);
     renderSectorChips([]);
+    renderBrandOptions([]);
+    renderBrandSummary([]);
     return;
   }
 
+  const sectorScopedProducts = getSectorScopedProducts();
   const visibleProducts = getVisibleProducts();
   renderSectorChips(state.products);
+  renderBrandOptions(sectorScopedProducts);
+  renderBrandSummary(sectorScopedProducts, visibleProducts);
 
   if (!visibleProducts.length) {
     elements.tableBody.innerHTML =
@@ -496,6 +518,74 @@ function renderSectorChips(products) {
     .map((sector) => `<span class="sector-chip">${escapeHtml(sector)}: ${formatNumber(counts.get(sector))}</span>`);
 
   elements.sectorChips.innerHTML = ordered.join('');
+}
+
+function renderBrandOptions(products) {
+  const brands = Array.from(
+    new Set(products.map((product) => product.brand || 'Sem marca').filter(Boolean))
+  ).sort((left, right) => left.localeCompare(right, 'pt-BR'));
+
+  if (state.selectedBrand !== 'Todas' && !brands.includes(state.selectedBrand)) {
+    state.selectedBrand = 'Todas';
+  }
+
+  elements.brandFilter.innerHTML = ['<option value="Todas">Todas</option>']
+    .concat(brands.map((brand) => `<option value="${escapeHtml(brand)}">${escapeHtml(brand)}</option>`))
+    .join('');
+  elements.brandFilter.value = state.selectedBrand;
+}
+
+function renderBrandSummary(sectorScopedProducts, visibleProducts) {
+  if (!sectorScopedProducts.length) {
+    elements.brandSummaryBody.innerHTML =
+      '<tr><td colspan="5" class="empty-state">Importe as planilhas para gerar os totais por marca.</td></tr>';
+    updateScopeSummary([]);
+    return;
+  }
+
+  const brandMap = new Map();
+  sectorScopedProducts.forEach((product) => {
+    const brand = product.brand || 'Sem marca';
+    const current = brandMap.get(brand) || {
+      brand,
+      products: 0,
+      stock: 0,
+      currentSales: 0,
+      projection: 0
+    };
+
+    current.products += 1;
+    current.stock += product.currentStock;
+    current.currentSales += product.monthlySales[2];
+    current.projection += product.projection;
+    brandMap.set(brand, current);
+  });
+
+  const rows = Array.from(brandMap.values()).sort((left, right) => right.currentSales - left.currentSales);
+  elements.brandSummaryBody.innerHTML = rows
+    .map((row) => `
+      <tr>
+        <td>${escapeHtml(row.brand)}</td>
+        <td>${formatNumber(row.products)}</td>
+        <td>${formatNumber(row.stock)}</td>
+        <td>${formatNumber(row.currentSales)}</td>
+        <td>${formatNumber(row.projection)}</td>
+      </tr>
+    `)
+    .join('');
+
+  updateScopeSummary(visibleProducts, rows.length);
+}
+
+function updateScopeSummary(products, brandCount = 0) {
+  const sectorLabel = state.selectedSector === 'Todos' ? 'Todos os produtos' : state.selectedSector;
+  const brandLabel = state.selectedBrand === 'Todas' ? 'todas as marcas' : state.selectedBrand;
+  elements.scopeTitle.textContent = `Totais de ${sectorLabel}`;
+  elements.scopeSubtitle.textContent = `Recorte atual: ${sectorLabel} | Marca: ${brandLabel}`;
+  elements.scopeStock.textContent = formatNumber(products.reduce((sum, product) => sum + product.currentStock, 0));
+  elements.scopeCurrentSales.textContent = formatNumber(products.reduce((sum, product) => sum + product.monthlySales[2], 0));
+  elements.scopeProjection.textContent = formatNumber(products.reduce((sum, product) => sum + product.projection, 0));
+  elements.scopeBrandCount.textContent = formatNumber(brandCount);
 }
 
 function updateKpis(products) {
@@ -579,6 +669,11 @@ elements.processButton.addEventListener('click', processFiles);
 elements.clearButton.addEventListener('click', clearAll);
 elements.sectorFilter.addEventListener('change', (event) => {
   state.selectedSector = event.target.value;
+  state.selectedBrand = 'Todas';
+  render();
+});
+elements.brandFilter.addEventListener('change', (event) => {
+  state.selectedBrand = event.target.value;
   render();
 });
 
