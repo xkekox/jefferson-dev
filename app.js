@@ -1870,6 +1870,24 @@ function setMessage(type, text) {
   refs.messageBox.textContent = text;
 }
 
+function nextPaint() {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      setTimeout(resolve, 0);
+    });
+  });
+}
+
+function setProcessButtonsState(isProcessing) {
+  [refs.processButton, refs.processStockButton, refs.processSalesButton].forEach((button) => {
+    if (!button) {
+      return;
+    }
+    button.disabled = isProcessing;
+    button.classList.toggle("is-processing", isProcessing);
+  });
+}
+
 function setStatus(element, label, loaded) {
   element.textContent = label;
   element.classList.toggle("is-ready", loaded);
@@ -2241,7 +2259,9 @@ async function registerImport(kind, rows, sourceName) {
 
 async function handleProcess(mode) {
   try {
+    setProcessButtonsState(true);
     setMessage("info", "Lendo relatorios do ERP do cliente Zain para a operacao de gabinetes...");
+    await nextPaint();
 
     const stockRows =
       mode === "sales"
@@ -2330,6 +2350,8 @@ async function handleProcess(mode) {
     }
   } catch (error) {
     setMessage("error", error.message || "Falha ao processar os relatorios.");
+  } finally {
+    setProcessButtonsState(false);
   }
 }
 
