@@ -1587,6 +1587,54 @@ async function readTextFile(file) {
   return file.text();
 }
 
+async function readPdfFile(file) {
+  if (typeof pdfjsLib === "undefined") {
+    throw new Error("Leitor de PDF indisponivel no momento. Recarregue a pagina e tente novamente.");
+  }
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.js";
+
+  const buffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const pages = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const lines = [];
+    let currentLine = "";
+    let previousY = null;
+
+    for (const item of content.items) {
+      const y = Math.round(item.transform?.[5] || 0);
+      const text = String(item.str || "").trim();
+      if (!text) {
+        continue;
+      }
+
+      if (previousY !== null && Math.abs(y - previousY) > 2) {
+        if (currentLine.trim()) {
+          lines.push(currentLine.trim());
+        }
+        currentLine = text;
+      } else {
+        currentLine = currentLine ? `${currentLine} ${text}` : text;
+      }
+
+      previousY = y;
+    }
+
+    if (currentLine.trim()) {
+      lines.push(currentLine.trim());
+    }
+
+    pages.push(lines.join("\n"));
+  }
+
+  return pages.join("\n");
+}
+
 function parseStockSpreadsheetByFixedColumns(matrix) {
   return matrix
     .map((row) => ({
@@ -1661,7 +1709,7 @@ async function readUploadedFile(file, aliasesByField, kind) {
   if (["xlsx", "xls"].includes(extension)) {
     return readSpreadsheetFile(file, aliasesByField, kind);
   }
-  const text = await readTextFile(file);
+  const text = extension === "pdf" ? await readPdfFile(file) : await readTextFile(file);
   if (kind === "estoque") {
     const blockRows = parseStockBlockText(text);
     if (blockRows.length) {
