@@ -170,7 +170,7 @@
                 <span id="stockStatus" class="dock-status">Aguardando</span>
               </div>
               <p class="dock-copy">Esperado: codigo, nome do item e saldo de estoque.</p>
-              <input id="stockFile" type="file" accept=".xlsx,.xls,.csv,.txt" />
+              <input id="stockFile" type="file" accept=".xlsx,.xls,.csv,.txt,.pdf" />
               <button id="stockExampleButton" class="button-inline" type="button">Usar exemplo</button>
               <label for="stockText">Colar relatorio</label>
               <textarea
@@ -189,7 +189,7 @@
                 <span id="salesStatus" class="dock-status">Aguardando</span>
               </div>
               <p class="dock-copy">Esperado: codigo, nome, data e quantidade faturada.</p>
-              <input id="salesFile" type="file" accept=".xlsx,.xls,.csv,.txt" />
+              <input id="salesFile" type="file" accept=".xlsx,.xls,.csv,.txt,.pdf" />
               <button id="salesExampleButton" class="button-inline" type="button">Usar exemplo</button>
               <label for="salesText">Colar relatorio</label>
               <textarea
@@ -451,6 +451,7 @@
     </div>
 
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=20260322b"></script>
     <script src="./app.js?v=20260322b"></script>
