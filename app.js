@@ -93,6 +93,7 @@ const STORAGE_KEYS = {
   products: "jefferson-dev-products",
   orders: "jefferson-dev-orders",
   imports: "jefferson-dev-imports",
+  processedSnapshot: "jefferson-dev-processed-snapshot",
   orderDraft: "jefferson-dev-order-draft",
   activeTab: "jefferson-dev-active-tab",
   supabaseConfig: "jefferson-dev-supabase-config"
@@ -779,6 +780,28 @@ function saveProducts() {
   writeStorage(STORAGE_KEYS.products, state.persistedProducts);
 }
 
+function saveProcessedSnapshot() {
+  writeStorage(STORAGE_KEYS.processedSnapshot, {
+    processed: state.processed,
+    months: state.months,
+    monitoredInput: refs.monitoredInput?.value || "",
+    stockStatus: refs.dashboardStockStatus?.textContent || "Sem leitura",
+    salesStatus: refs.dashboardSalesStatus?.textContent || "Sem leitura"
+  });
+}
+
+function loadProcessedSnapshot() {
+  return readStorage(STORAGE_KEYS.processedSnapshot, null);
+}
+
+function clearProcessedSnapshot() {
+  try {
+    window.localStorage.removeItem(STORAGE_KEYS.processedSnapshot);
+  } catch {
+    // ignore storage failures
+  }
+}
+
 function formatOrderValue(value) {
   return moneyUSD(Number(value || 0));
 }
@@ -1044,6 +1067,22 @@ function renderPersistedProductCount() {
   if (refs.dashboardProductBaseCount) {
     refs.dashboardProductBaseCount.textContent = formatInteger(state.persistedProducts.length);
   }
+}
+
+function restoreProcessedSnapshot(snapshot) {
+  if (!snapshot || !Array.isArray(snapshot.processed) || !snapshot.processed.length) {
+    return false;
+  }
+
+  state.processed = snapshot.processed;
+  state.months = Array.isArray(snapshot.months) ? snapshot.months : [];
+  refs.monitoredInput.value = snapshot.monitoredInput || "";
+  refs.dashboardStockStatus.textContent = snapshot.stockStatus || "Sem leitura";
+  refs.dashboardSalesStatus.textContent = snapshot.salesStatus || "Sem leitura";
+  updateSummary();
+  renderTable();
+  renderMonitorList();
+  return true;
 }
 
 function setOrderDraft(nextDraft) {
@@ -1528,7 +1567,8 @@ function renderTable() {
     `;
 }
 
-function resetState() {
+function resetState(options = {}) {
+  const { clearSnapshot = false } = options;
   state.stockRows = [];
   state.salesRows = [];
   state.stockLoaded = false;
@@ -1540,6 +1580,9 @@ function resetState() {
   state.productConfigs = {};
   state.importHistory = [];
   state.orderDraft = emptyOrderDraft();
+  if (clearSnapshot) {
+    clearProcessedSnapshot();
+  }
 
   refs.stockFile.value = "";
   refs.salesFile.value = "";
@@ -1662,6 +1705,7 @@ async function handleProcess(mode) {
     await upsertProcessedProductsToSupabase(state.persistedProducts);
     updateSummary();
     renderTable();
+    saveProcessedSnapshot();
 
     if (stockRows) {
       await registerImport("estoque", stockRows, getSourceName(refs.stockFile, "Texto colado"));
@@ -1722,6 +1766,7 @@ function reprocessIfLoaded() {
     processData();
     updateSummary();
     renderTable();
+    saveProcessedSnapshot();
   }
 }
 
@@ -1742,7 +1787,7 @@ function handleConfigChange(event) {
 refs.processButton.addEventListener("click", handleProcessBoth);
 refs.processStockButton.addEventListener("click", handleProcessStock);
 refs.processSalesButton.addEventListener("click", handleProcessSales);
-refs.clearButton.addEventListener("click", resetState);
+refs.clearButton.addEventListener("click", () => resetState({ clearSnapshot: true }));
 refs.searchInput.addEventListener("input", renderTable);
 refs.riskFilter.addEventListener("change", renderTable);
 refs.sortSelect.addEventListener("change", renderTable);
@@ -1810,6 +1855,7 @@ async function initializeApp() {
   renderSavedOrders();
   renderImportHistory();
   renderPersistedProductCount();
+  restoreProcessedSnapshot(loadProcessedSnapshot());
 }
 
 void initializeApp();
