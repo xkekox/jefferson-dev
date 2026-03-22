@@ -232,6 +232,43 @@ function parseStockBlockText(text) {
   return rows;
 }
 
+function parseStockTabbedRows(text) {
+  const lines = String(text || "")
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const rows = [];
+  for (const line of lines) {
+    const columns = line.split("\t").map((value) => String(value || "").trim());
+    if (columns.length < 8) {
+      continue;
+    }
+
+    const [code, sku, name] = columns;
+    const stock = columns[7];
+    const codeLike = /^\d{4,}$/.test(code);
+    const skuLike = /[a-z]/i.test(sku) && !/^\d+$/.test(sku);
+    const nameLike = /[a-z]/i.test(name) && name.length > 4;
+    const stockLike = /^-?\d+[.,]?\d*$/.test(String(stock));
+
+    if (!codeLike || !skuLike || !nameLike || !stockLike) {
+      continue;
+    }
+
+    rows.push({
+      warehouse: "",
+      code,
+      sku,
+      name,
+      stock
+    });
+  }
+
+  return rows;
+}
+
 function findColumn(row, aliases) {
   const entries = Object.keys(row);
   const normalizedAliases = aliases.map((alias) => normalizeKey(alias));
@@ -1714,6 +1751,10 @@ async function readUploadedFile(file, aliasesByField, kind) {
   }
   const text = extension === "pdf" ? await readPdfFile(file) : await readTextFile(file);
   if (kind === "estoque") {
+    const tabbedRows = parseStockTabbedRows(text);
+    if (tabbedRows.length) {
+      return tabbedRows;
+    }
     const blockRows = parseStockBlockText(text);
     if (blockRows.length) {
       return blockRows;
@@ -1734,9 +1775,11 @@ async function loadDataset({ fileInput, textArea, aliases, kind }) {
     file
       ? await readUploadedFile(file, aliases, kind)
       : kind === "estoque"
-        ? parseStockBlockText(pasted).length
-          ? parseStockBlockText(pasted)
-          : parseDelimitedText(pasted)
+        ? parseStockTabbedRows(pasted).length
+          ? parseStockTabbedRows(pasted)
+          : parseStockBlockText(pasted).length
+            ? parseStockBlockText(pasted)
+            : parseDelimitedText(pasted)
         : parseDelimitedText(pasted);
 
   if (!rows.length) {
