@@ -13,6 +13,8 @@ const elements = {
   salesFile: document.getElementById('salesFile'),
   processButton: document.getElementById('processButton'),
   clearButton: document.getElementById('clearButton'),
+  searchButton: document.getElementById('searchButton'),
+  clearSearchButton: document.getElementById('clearSearchButton'),
   messageBox: document.getElementById('messageBox'),
   tableBody: document.getElementById('tableBody'),
   monthHeader0: document.getElementById('monthHeader0'),
@@ -563,6 +565,9 @@ function getVisibleProducts() {
     const searchableCode = normalizeKey(product.code);
     const searchableSku = normalizeKey(product.sku);
     const searchMatch = !search || searchableCode.includes(search) || searchableSku.includes(search);
+    if (search) {
+      return searchMatch;
+    }
     const sectorMatch = state.selectedSector === 'Todos' || product.sector === state.selectedSector;
     const brandMatch = state.selectedBrand === 'Todas' || normalizeBrand(product.brand) === state.selectedBrand;
     const subgroupValue = product.subgroup || product.group || 'Sem subgrupo';
@@ -732,12 +737,17 @@ function renderBrandSummary(sectorScopedProducts, visibleProducts) {
 }
 
 function updateScopeSummary(products, brandCount = 0) {
+  const searchMode = Boolean(state.searchTerm);
   const sectorLabel = state.selectedSector === 'Todos' ? 'Todos os produtos' : state.selectedSector;
   const brandLabel = state.selectedBrand === 'Todas' ? 'todas as marcas' : state.selectedBrand;
   const subgroupLabel = state.selectedSubgroup === 'Todos' ? 'todos os subgrupos' : state.selectedSubgroup;
-  const searchLabel = state.searchTerm ? ` | Busca: ${state.searchTerm}` : '';
-  elements.scopeTitle.textContent = `Totais de ${sectorLabel}`;
-  elements.scopeSubtitle.textContent = `Recorte atual: ${sectorLabel} | Marca: ${brandLabel} | Subgrupo: ${subgroupLabel}${searchLabel}`;
+  if (searchMode) {
+    elements.scopeTitle.textContent = `Resultado da busca`;
+    elements.scopeSubtitle.textContent = `Busca atual por codigo/SKU: ${state.searchTerm}`;
+  } else {
+    elements.scopeTitle.textContent = `Totais de ${sectorLabel}`;
+    elements.scopeSubtitle.textContent = `Recorte atual: ${sectorLabel} | Marca: ${brandLabel} | Subgrupo: ${subgroupLabel}`;
+  }
   elements.scopeStock.textContent = formatNumber(products.reduce((sum, product) => sum + product.currentStock, 0));
   elements.scopeCurrentSales.textContent = formatNumber(products.reduce((sum, product) => sum + product.monthlySales[2], 0));
   elements.scopeProjection.textContent = formatNumber(products.reduce((sum, product) => sum + product.projection, 0));
@@ -829,8 +839,20 @@ elements.sectorFilter.addEventListener('change', (event) => {
   state.selectedSubgroup = 'Todos';
   render();
 });
-elements.productSearch.addEventListener('input', (event) => {
-  state.searchTerm = event.target.value.trim();
+elements.searchButton.addEventListener('click', () => {
+  state.searchTerm = elements.productSearch.value.trim();
+  render();
+});
+elements.productSearch.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    state.searchTerm = elements.productSearch.value.trim();
+    render();
+  }
+});
+elements.clearSearchButton.addEventListener('click', () => {
+  elements.productSearch.value = '';
+  state.searchTerm = '';
   render();
 });
 elements.brandFilter.addEventListener('change', (event) => {
