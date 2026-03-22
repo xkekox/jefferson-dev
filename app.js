@@ -1546,7 +1546,31 @@ async function readTextFile(file) {
   return file.text();
 }
 
-async function readSpreadsheetFile(file, aliasesByField) {
+function parseStockSpreadsheetByFixedColumns(matrix) {
+  return matrix
+    .map((row) => ({
+      code: String(row[3] ?? "").trim(),
+      sku: String(row[4] ?? "").trim(),
+      name: String(row[5] ?? "").trim(),
+      stock: row[10] ?? ""
+    }))
+    .filter((row) => {
+      const normalizedCode = normalizeKey(row.code);
+      const normalizedSku = normalizeKey(row.sku);
+      const normalizedName = normalizeKey(row.name);
+      const normalizedStock = normalizeKey(row.stock);
+
+      const headerLike =
+        ["codigo", "cod"].includes(normalizedCode) ||
+        normalizedSku === "sku" ||
+        normalizedName.includes("descricao") ||
+        normalizedStock.includes("estoque");
+
+      return !headerLike && Boolean(row.code) && (Boolean(row.name) || Boolean(row.sku));
+    });
+}
+
+async function readSpreadsheetFile(file, aliasesByField, kind) {
   if (typeof XLSX === "undefined") {
     throw new Error("Leitor de Excel indisponivel no momento. Recarregue a pagina e tente novamente.");
   }
@@ -1560,6 +1584,13 @@ async function readSpreadsheetFile(file, aliasesByField) {
     defval: "",
     raw: true
   });
+
+  if (kind === "estoque") {
+    const fixedRows = parseStockSpreadsheetByFixedColumns(matrix);
+    if (fixedRows.length) {
+      return fixedRows;
+    }
+  }
 
   const candidateRows = matrix
     .map((row, index) => ({ index, row: row.map((value) => String(value || "").trim()) }))
@@ -1584,10 +1615,10 @@ async function readSpreadsheetFile(file, aliasesByField) {
   return rowsFromHeaderMatrix(matrix, bestHeaderRowIndex);
 }
 
-async function readUploadedFile(file, aliasesByField) {
+async function readUploadedFile(file, aliasesByField, kind) {
   const extension = (file.name.split(".").pop() || "").toLowerCase();
   if (["xlsx", "xls"].includes(extension)) {
-    return readSpreadsheetFile(file, aliasesByField);
+    return readSpreadsheetFile(file, aliasesByField, kind);
   }
   const text = await readTextFile(file);
   return parseDelimitedText(text);
@@ -1601,12 +1632,22 @@ async function loadDataset({ fileInput, textArea, aliases, kind }) {
     return null;
   }
 
-  const rows = file ? await readUploadedFile(file, aliases) : parseDelimitedText(pasted);
+  const rows = file ? await readUploadedFile(file, aliases, kind) : parseDelimitedText(pasted);
 
   if (!rows.length) {
     throw new Error(
       `Nao foi possivel ler o relatorio de ${kind}. Verifique se o arquivo tem cabecalho e ao menos uma linha de dados.`
     );
+  }
+
+  if (
+    kind === "estoque" &&
+    Object.prototype.hasOwnProperty.call(rows[0], "code") &&
+    Object.prototype.hasOwnProperty.call(rows[0], "sku") &&
+    Object.prototype.hasOwnProperty.call(rows[0], "name") &&
+    Object.prototype.hasOwnProperty.call(rows[0], "stock")
+  ) {
+    return rows;
   }
 
   const mappedColumns = findColumnByScore(rows, aliases);
