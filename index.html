@@ -13,7 +13,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260322f" />
+    <link rel="stylesheet" href="./styles.css?v=20260322g" />
   </head>
   <body>
     <div class="console-shell">
@@ -113,6 +113,25 @@
                   <article class="monitor-stat">
                     <span>Alertas ignorados</span>
                     <strong id="ignoredAlertCount">0</strong>
+                  </article>
+                </div>
+              </article>
+
+              <article class="dashboard-card">
+                <p class="section-kicker">Estoque</p>
+                <h4>Resumo estrutural</h4>
+                <div class="monitor-summary compact">
+                  <article class="monitor-stat">
+                    <span>SKUs listados</span>
+                    <strong id="stockSkuCount">0</strong>
+                  </article>
+                  <article class="monitor-stat">
+                    <span>Com estoque</span>
+                    <strong id="stockPositiveCount">0</strong>
+                  </article>
+                  <article class="monitor-stat">
+                    <span>Sem estoque</span>
+                    <strong id="stockZeroCount">0</strong>
                   </article>
                 </div>
               </article>
@@ -453,7 +472,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./config.js?v=20260322f"></script>
-    <script src="./app.js?v=20260322f"></script>
+    <script src="./config.js?v=20260322g"></script>
+    <script src="./app.js?v=20260322g"></script>
   </body>
 </html>
