@@ -88,6 +88,15 @@ const SALES_ALIASES = {
   quantity: ["quantidade", "qtd", "qtde", "vendido", "qtd vendida", "quantidade vendida"]
 };
 
+STOCK_ALIASES.code.push("cod produto", "codigo sku", "sku produto");
+STOCK_ALIASES.name.push("descricao item", "produto descricao");
+STOCK_ALIASES.stock.push("saldo atual", "qtd disponivel", "quantidade disponivel", "estoque disponivel");
+
+SALES_ALIASES.code.push("cod produto", "codigo sku", "sku produto");
+SALES_ALIASES.name.push("descricao item", "produto descricao");
+SALES_ALIASES.date.push("dt faturamento", "data movimento");
+SALES_ALIASES.quantity.push("quantidade faturada", "qtd faturada");
+
 const STORAGE_KEYS = {
   configs: "jefferson-dev-product-configs",
   products: "jefferson-dev-products",
@@ -1443,12 +1452,8 @@ async function loadDataset({ fileInput, textArea, aliases, kind }) {
   }
 
   const firstRow = rows[0];
-  const headers = Object.keys(firstRow);
   const mappedColumns = Object.fromEntries(
-    Object.entries(aliases).map(([field, fieldAliases], index) => {
-      const found = findColumn(firstRow, fieldAliases);
-      return [field, found || headers[index] || null];
-    })
+    Object.entries(aliases).map(([field, fieldAliases]) => [field, findColumn(firstRow, fieldAliases)])
   );
 
   const missing = Object.entries(mappedColumns)
@@ -1459,13 +1464,21 @@ async function loadDataset({ fileInput, textArea, aliases, kind }) {
     throw new Error(`Colunas obrigatorias ausentes no relatorio de ${kind}: ${missing.join(", ")}.`);
   }
 
-  return rows.map((row) => {
+  const normalizedRows = rows.map((row) => {
     const normalized = {};
     for (const [field, column] of Object.entries(mappedColumns)) {
       normalized[field] = row[column];
     }
     return normalized;
   });
+
+  if (!normalizedRows.some((row) => String(row.code || "").trim())) {
+    throw new Error(
+      `O relatorio de ${kind} foi lido, mas nenhuma linha trouxe codigo de produto reconhecivel. Revise os cabecalhos do arquivo.`
+    );
+  }
+
+  return normalizedRows;
 }
 
 function setMessage(type, text) {
@@ -1579,6 +1592,12 @@ function processData() {
         reorderAlert
       };
     });
+
+  if (!state.processed.length) {
+    throw new Error(
+      "Nenhum produto consolidado foi encontrado. Verifique se o relatorio possui codigo do produto e valores nas colunas esperadas."
+    );
+  }
 
   renderMonitorList();
 }
