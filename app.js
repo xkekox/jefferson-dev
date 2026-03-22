@@ -6,6 +6,7 @@ const state = {
   processed: [],
   months: [],
   monitoredTerms: [],
+  persistedProducts: [],
   productConfigs: {},
   savedOrders: [],
   importHistory: [],
@@ -44,6 +45,7 @@ const refs = {
   dashboardStockStatus: document.getElementById("dashboardStockStatus"),
   dashboardSalesStatus: document.getElementById("dashboardSalesStatus"),
   dashboardDatabaseStatus: document.getElementById("dashboardDatabaseStatus"),
+  dashboardProductBaseCount: document.getElementById("dashboardProductBaseCount"),
   supabaseUrlInput: document.getElementById("supabaseUrlInput"),
   supabaseAnonKeyInput: document.getElementById("supabaseAnonKeyInput"),
   saveSupabaseConfigButton: document.getElementById("saveSupabaseConfigButton"),
@@ -89,6 +91,7 @@ const SALES_ALIASES = {
 
 const STORAGE_KEYS = {
   configs: "jefferson-dev-product-configs",
+  products: "jefferson-dev-products",
   orders: "jefferson-dev-orders",
   imports: "jefferson-dev-imports",
   orderDraft: "jefferson-dev-order-draft",
@@ -100,6 +103,7 @@ const PERSISTENCE = {
   client: null,
   mode: "local",
   tables: {
+    products: "zain_products",
     productConfigs: "zain_product_configs",
     orders: "zain_orders",
     imports: "zain_import_batches"
@@ -391,9 +395,11 @@ async function initializePersistence() {
 }
 
 async function reloadPersistentData() {
+  state.persistedProducts = await loadProductsFromSupabase();
   state.productConfigs = await loadProductConfigsFromSupabase();
   state.savedOrders = await loadOrdersFromSupabase();
   state.importHistory = await loadImportsFromSupabase();
+  renderPersistedProductCount();
   renderMonitorList();
   renderTable();
   renderOrderForm();
@@ -455,6 +461,37 @@ async function loadProductConfigsFromSupabase() {
   );
 
   writeStorage(STORAGE_KEYS.configs, mapped);
+  return mapped;
+}
+
+async function loadProductsFromSupabase() {
+  if (PERSISTENCE.mode !== "supabase" || !PERSISTENCE.client) {
+    return readStorage(STORAGE_KEYS.products, []);
+  }
+
+  const { data, error } = await PERSISTENCE.client
+    .from(PERSISTENCE.tables.products)
+    .select("product_code, sku, product_name, latest_stock, current_sales, projected_sales, coverage_days, updated_at")
+    .eq("project_scope", PERSISTENCE.scope)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.warn("Falha ao carregar produtos do Supabase.", error);
+    return readStorage(STORAGE_KEYS.products, []);
+  }
+
+  const mapped = (data || []).map((row) => ({
+    code: row.product_code,
+    sku: row.sku || "",
+    name: row.product_name || "",
+    stock: Number(row.latest_stock || 0),
+    currentSales: Number(row.current_sales || 0),
+    projection: Number(row.projected_sales || 0),
+    coverageDays: row.coverage_days == null ? null : Number(row.coverage_days),
+    updatedAt: row.updated_at || ""
+  }));
+
+  writeStorage(STORAGE_KEYS.products, mapped);
   return mapped;
 }
 
@@ -612,6 +649,31 @@ async function insertImportBatchToSupabase(batch) {
   }
 }
 
+async function upsertProcessedProductsToSupabase(products) {
+  if (PERSISTENCE.mode !== "supabase" || !PERSISTENCE.client || !products.length) {
+    return;
+  }
+
+  const payload = products.map((product) => ({
+    project_scope: PERSISTENCE.scope,
+    product_code: product.code,
+    sku: product.sku || "",
+    product_name: product.name || "",
+    latest_stock: Number(product.stock || 0),
+    current_sales: Number(product.currentSales || 0),
+    projected_sales: Number(product.projection || 0),
+    coverage_days: Number.isFinite(product.coverageDays) ? product.coverageDays : null
+  }));
+
+  const { error } = await PERSISTENCE.client.from(PERSISTENCE.tables.products).upsert(payload, {
+    onConflict: "project_scope,product_code"
+  });
+
+  if (error) {
+    console.warn("Falha ao salvar produtos no Supabase.", error);
+  }
+}
+
 function setActiveTab(tabName) {
   refs.tabButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.tabTarget === tabName);
@@ -699,6 +761,10 @@ function saveOrders() {
 
 function saveImports() {
   writeStorage(STORAGE_KEYS.imports, state.importHistory);
+}
+
+function saveProducts() {
+  writeStorage(STORAGE_KEYS.products, state.persistedProducts);
 }
 
 function formatOrderValue(value) {
@@ -960,6 +1026,12 @@ function renderImportHistory() {
       </tr>
     `)
     .join("");
+}
+
+function renderPersistedProductCount() {
+  if (refs.dashboardProductBaseCount) {
+    refs.dashboardProductBaseCount.textContent = formatInteger(state.persistedProducts.length);
+  }
 }
 
 function setOrderDraft(nextDraft) {
@@ -1454,6 +1526,7 @@ function resetState() {
   state.processed = [];
   state.months = [];
   state.monitoredTerms = [];
+  state.persistedProducts = [];
   state.productConfigs = {};
   state.importHistory = [];
   state.orderDraft = emptyOrderDraft();
@@ -1479,6 +1552,7 @@ function resetState() {
   setStatus(refs.salesStatus, "Aguardando", false);
   refs.dashboardStockStatus.textContent = "Aguardando";
   refs.dashboardSalesStatus.textContent = "Aguardando";
+  refs.dashboardProductBaseCount.textContent = "0";
   setMessage("info", "Carregue um ou ambos os relatorios para montar a visao operacional de Zain na Pichau.");
 
   refs.productCount.textContent = "0";
@@ -1493,6 +1567,7 @@ function resetState() {
   renderOrderTotals();
   renderSavedOrders();
   renderImportHistory();
+  renderPersistedProductCount();
 }
 
 function createImportBatch(kind, rows, sourceName) {
@@ -1561,6 +1636,19 @@ async function handleProcess(mode) {
     setStatus(refs.salesStatus, salesRows ? "Carregado" : "Nao carregado", Boolean(salesRows));
 
     processData();
+    state.persistedProducts = state.processed.map((product) => ({
+      code: product.code,
+      sku: product.sku || "",
+      name: product.name || "",
+      stock: product.stock,
+      currentSales: product.currentSales,
+      projection: product.projection,
+      coverageDays: product.coverageDays,
+      updatedAt: new Date().toISOString()
+    }));
+    saveProducts();
+    renderPersistedProductCount();
+    await upsertProcessedProductsToSupabase(state.persistedProducts);
     updateSummary();
     renderTable();
 
@@ -1693,6 +1781,7 @@ refs.clearSupabaseConfigButton?.addEventListener("click", () => {
 async function initializeApp() {
   resetState();
   await initializePersistence();
+  state.persistedProducts = await loadProductsFromSupabase();
   state.productConfigs = await loadProductConfigsFromSupabase();
   state.savedOrders = await loadOrdersFromSupabase();
   state.importHistory = await loadImportsFromSupabase();
@@ -1705,6 +1794,7 @@ async function initializeApp() {
   renderOrderTotals();
   renderSavedOrders();
   renderImportHistory();
+  renderPersistedProductCount();
 }
 
 void initializeApp();
