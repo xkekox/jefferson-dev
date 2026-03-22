@@ -1706,7 +1706,8 @@ async function readSpreadsheetFile(file, aliasesByField, kind) {
 
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
-  const firstSheetName = workbook.SheetNames[0];
+  const firstSheetName =
+    kind === "estoque" && workbook.SheetNames.includes("Estoque") ? "Estoque" : workbook.SheetNames[0];
   const sheet = workbook.Sheets[firstSheetName];
   const matrix = XLSX.utils.sheet_to_json(sheet, {
     header: 1,
@@ -1715,10 +1716,7 @@ async function readSpreadsheetFile(file, aliasesByField, kind) {
   });
 
   if (kind === "estoque") {
-    const fixedRows = parseStockSpreadsheetByFixedColumns(matrix);
-    if (fixedRows.length) {
-      return fixedRows;
-    }
+    return parseStockSpreadsheetByFixedColumns(matrix);
   }
 
   const candidateRows = matrix
@@ -1759,6 +1757,7 @@ async function readUploadedFile(file, aliasesByField, kind) {
     if (blockRows.length) {
       return blockRows;
     }
+    return [];
   }
   return parseDelimitedText(text);
 }
@@ -1777,9 +1776,7 @@ async function loadDataset({ fileInput, textArea, aliases, kind }) {
       : kind === "estoque"
         ? parseStockTabbedRows(pasted).length
           ? parseStockTabbedRows(pasted)
-          : parseStockBlockText(pasted).length
-            ? parseStockBlockText(pasted)
-            : parseDelimitedText(pasted)
+          : parseStockBlockText(pasted)
         : parseDelimitedText(pasted);
 
   if (!rows.length) {
