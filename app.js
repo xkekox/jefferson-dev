@@ -1,6 +1,8 @@
 const state = {
   stockRows: [],
   salesRows: [],
+  salesSheetRows: [],
+  salesSheetMode: "empty",
   stockLoaded: false,
   salesLoaded: false,
   allProcessed: [],
@@ -27,6 +29,18 @@ const refs = {
   salesStatusMirror: document.getElementById("salesStatusMirror"),
   stockExampleButton: document.getElementById("stockExampleButton"),
   salesExampleButton: document.getElementById("salesExampleButton"),
+  spreadsheetFile: document.getElementById("spreadsheetFile"),
+  spreadsheetText: document.getElementById("spreadsheetText"),
+  processSpreadsheetButton: document.getElementById("processSpreadsheetButton"),
+  clearSpreadsheetButton: document.getElementById("clearSpreadsheetButton"),
+  spreadsheetStatus: document.getElementById("spreadsheetStatus"),
+  spreadsheetRowCount: document.getElementById("spreadsheetRowCount"),
+  spreadsheetOrderCount: document.getElementById("spreadsheetOrderCount"),
+  spreadsheetSkuCount: document.getElementById("spreadsheetSkuCount"),
+  spreadsheetGrossTotal: document.getElementById("spreadsheetGrossTotal"),
+  spreadsheetTableHead: document.getElementById("spreadsheetTableHead"),
+  spreadsheetTableBody: document.getElementById("spreadsheetTableBody"),
+  spreadsheetDebug: document.getElementById("spreadsheetDebug"),
   processStockButton: document.getElementById("processStockButton"),
   processSalesButton: document.getElementById("processSalesButton"),
   processButton: document.getElementById("processButton"),
@@ -106,7 +120,7 @@ STOCK_ALIASES.stock.push("saldo atual", "qtd disponivel", "quantidade disponivel
 SALES_ALIASES.code.push("cod produto", "codigo sku", "sku produto");
 SALES_ALIASES.name.push("descricao item", "produto descricao");
 SALES_ALIASES.date.push("dt faturamento", "data movimento");
-SALES_ALIASES.quantity.push("quantidade faturada", "qtd faturada");
+SALES_ALIASES.quantity.push("quant", "quant.", "quantidade faturada", "qtd faturada", "quant faturada");
 
 const STORAGE_KEYS = {
   configs: "jefferson-dev-product-configs",
@@ -134,8 +148,49 @@ const PERSISTENCE = {
 const PERFORMANCE_LIMITS = {
   maxRenderedRows: 300,
   maxSupabaseUpsertRows: 5000,
-  maxImportPayloadRows: 0
+  maxImportPayloadRows: 0,
+  maxLocalStorageProducts: 1500,
+  maxLocalSnapshotRows: 1500
 };
+
+const SALES_ANALYTIC_COLUMNS = [
+  { key: "note", label: "Nota" },
+  { key: "series", label: "Série" },
+  { key: "date", label: "Data" },
+  { key: "order", label: "Pedido" },
+  { key: "movementType", label: "Tipo Mov." },
+  { key: "code", label: "Código" },
+  { key: "companyCode", label: "Cód.Empresa" },
+  { key: "name", label: "Descrição" },
+  { key: "group", label: "Grupo" },
+  { key: "subgroup", label: "Subgrupo" },
+  { key: "intermediary", label: "Intermediador" },
+  { key: "paymentCondition", label: "Cond.Pgto" },
+  { key: "quantity", label: "Quant." },
+  { key: "value", label: "Valor" },
+  { key: "totalWithIpi", label: "Tot.Merc.+IPI" },
+  { key: "cmv", label: "CMV" },
+  { key: "marginCtb", label: "Margem Ctb" },
+  { key: "marginCtbPercent", label: "% Mg Ctb" },
+  { key: "cmvGer", label: "CMV Ger." },
+  { key: "marginGer", label: "Margem Ger" },
+  { key: "grossMarginPercent", label: "% Mg Ger" },
+  { key: "total", label: "Total" },
+  { key: "freight", label: "Frete" },
+  { key: "expenses", label: "Despesas" },
+  { key: "insurance", label: "Seguro" },
+  { key: "ipiValue", label: "Valor IPI" },
+  { key: "discount", label: "Desconto" },
+  { key: "cfop", label: "CFOP" },
+  { key: "cstOrigin", label: "CST Orig." },
+  { key: "stock", label: "Estoque" },
+  { key: "stValue", label: "Valor ST" },
+  { key: "customerCode", label: "Cód.Cliente" },
+  { key: "customer", label: "Cliente" },
+  { key: "category", label: "Categoria" },
+  { key: "brand", label: "Marca" },
+  { key: "carrier", label: "Transportadora" }
+];
 
 function normalizeKey(value) {
   return String(value || "")
@@ -192,6 +247,135 @@ function parseDelimitedText(text) {
       return accumulator;
     }, {});
   });
+}
+
+function parseSalesBlockText(text) {
+  const lines = String(text || "")
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim());
+
+  while (lines.length && !lines[0]) {
+    lines.shift();
+  }
+
+  while (lines.length && !lines[lines.length - 1]) {
+    lines.pop();
+  }
+
+  if (lines.length < 36) {
+    return [];
+  }
+
+  const rows = [];
+  const chunkSize = 36;
+
+  for (let index = 0; index <= lines.length - chunkSize; ) {
+    const chunk = lines.slice(index, index + chunkSize);
+    const date = chunk[2] || "";
+    const code = chunk[5] || "";
+    const name = chunk[7] || "";
+    const quantity = chunk[12] || "";
+
+    const dateLike = Boolean(parseDate(date));
+    const codeLike = /[a-zA-Z0-9]/.test(String(code).trim());
+    const nameLike = /[a-zA-Z]/.test(String(name).trim()) && String(name).trim().length > 4;
+    const quantityLike = parseNumber(quantity) !== 0 || ["0", "0,00", "0.00"].includes(String(quantity).trim());
+
+    if (dateLike && codeLike && nameLike && quantityLike) {
+      rows.push({
+        note: chunk[0] || "",
+        series: chunk[1] || "",
+        date,
+        code,
+        name,
+        companyProductCode: chunk[6] || "",
+        quantity,
+        order: chunk[3] || "",
+        movementType: chunk[4] || "",
+        companyCode: chunk[6] || "",
+        group: chunk[8] || "",
+        subgroup: chunk[9] || "",
+        intermediary: chunk[10] || "",
+        paymentCondition: chunk[11] || "",
+        value: chunk[13] || "",
+        totalWithIpi: chunk[14] || "",
+        cmv: chunk[15] || "",
+        marginCtb: chunk[16] || "",
+        marginCtbPercent: chunk[17] || "",
+        cmvGer: chunk[18] || "",
+        marginGer: chunk[19] || "",
+        marginGerPercent: chunk[20] || "",
+        total: chunk[21] || "",
+        freight: chunk[22] || "",
+        expenses: chunk[23] || "",
+        insurance: chunk[24] || "",
+        ipiValue: chunk[25] || "",
+        discount: chunk[26] || "",
+        cfop: chunk[27] || "",
+        cstOrigin: chunk[28] || "",
+        stock: chunk[29] || "",
+        stValue: chunk[30] || "",
+        customerCode: chunk[31] || "",
+        customer: chunk[32] || "",
+        category: chunk[33] || "",
+        brand: chunk[34] || "",
+        carrier: chunk[35] || ""
+      });
+      index += chunkSize;
+      continue;
+    }
+
+    index += 1;
+  }
+
+  return rows;
+}
+
+function parseCatalogBlockText(text) {
+  const lines = String(text || "")
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length < 9) {
+    return [];
+  }
+
+  const rows = [];
+  const chunkSize = 9;
+
+  for (let index = 0; index <= lines.length - chunkSize; ) {
+    const chunk = lines.slice(index, index + chunkSize);
+    const [code, name, metric, priceA, priceB, group, subgroup, multiple, note] = chunk;
+
+    const codeLike = /^\d{3,}$/.test(String(code).replace(/\./g, ""));
+    const nameLike = /[a-zA-ZÀ-ÿ]/.test(String(name)) && String(name).length > 4;
+    const metricLike = /^-?[\d.,]+$/.test(String(metric));
+    const priceALike = /^R\$\s*-?[\d.,]+$/.test(String(priceA));
+    const priceBLike = /^R\$\s*-?[\d.,]+$/.test(String(priceB));
+
+    if (codeLike && nameLike && metricLike && priceALike && priceBLike) {
+      rows.push({
+        code: String(code).replace(/\./g, ""),
+        name,
+        metric,
+        priceA,
+        priceB,
+        group,
+        subgroup,
+        multiple,
+        note
+      });
+      index += chunkSize;
+      continue;
+    }
+
+    index += 1;
+  }
+
+  return rows;
 }
 
 function parseStockBlockText(text) {
@@ -482,6 +666,9 @@ function parseDate(value) {
   }
 
   if (typeof value === "number" && typeof XLSX !== "undefined") {
+    if (value < 20000 || value > 60000) {
+      return null;
+    }
     const excelDate = XLSX.SSF.parse_date_code(value);
     if (excelDate) {
       return new Date(excelDate.y, excelDate.m - 1, excelDate.d, 12, 0, 0);
@@ -566,6 +753,37 @@ function formatDecimal(value) {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1
   }).format(value);
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(Number(value || 0));
+}
+
+function formatSpreadsheetCell(columnKey, value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "-";
+  }
+
+  if (["value", "totalWithIpi", "cmv", "marginCtb", "cmvGer", "marginGer", "total", "freight", "expenses", "insurance", "ipiValue", "discount", "stValue"].includes(columnKey)) {
+    return raw.startsWith("R$") ? raw : formatCurrency(parseNumber(raw));
+  }
+
+  if (["marginCtbPercent", "grossMarginPercent"].includes(columnKey)) {
+    const suffix = raw.endsWith("%") ? "" : "%";
+    return `${formatDecimal(parseNumber(raw))}${suffix}`;
+  }
+
+  if (columnKey === "quantity") {
+    return formatDecimal(parseNumber(raw));
+  }
+
+  return raw;
 }
 
 function readStorage(key, fallback) {
@@ -1034,13 +1252,26 @@ function saveImports() {
 }
 
 function saveProducts() {
-  writeStorage(STORAGE_KEYS.products, state.persistedProducts);
+  const productsToStore =
+    state.persistedProducts.length > PERFORMANCE_LIMITS.maxLocalStorageProducts
+      ? state.persistedProducts.slice(0, PERFORMANCE_LIMITS.maxLocalStorageProducts)
+      : state.persistedProducts;
+  writeStorage(STORAGE_KEYS.products, productsToStore);
 }
 
 function saveProcessedSnapshot() {
+  const allProcessedToStore =
+    state.allProcessed.length > PERFORMANCE_LIMITS.maxLocalSnapshotRows
+      ? state.allProcessed.slice(0, PERFORMANCE_LIMITS.maxLocalSnapshotRows)
+      : state.allProcessed;
+  const processedToStore =
+    state.processed.length > PERFORMANCE_LIMITS.maxLocalSnapshotRows
+      ? state.processed.slice(0, PERFORMANCE_LIMITS.maxLocalSnapshotRows)
+      : state.processed;
+
   writeStorage(STORAGE_KEYS.processedSnapshot, {
-    allProcessed: state.allProcessed,
-    processed: state.processed,
+    allProcessed: allProcessedToStore,
+    processed: processedToStore,
     months: state.months,
     monitoredInput: refs.monitoredInput?.value || "",
     stockStatus: refs.dashboardStockStatus?.textContent || "Sem leitura",
@@ -1118,6 +1349,8 @@ function hydrateFromPersistedProducts() {
   state.months = monthKeys;
   state.stockRows = [];
   state.salesRows = [];
+  state.salesSheetRows = [];
+  state.salesSheetMode = "empty";
   state.stockLoaded = false;
   state.salesLoaded = false;
   state.allProcessed = state.persistedProducts
@@ -1806,6 +2039,30 @@ function parseStockSpreadsheetByFixedColumns(matrix) {
     });
 }
 
+function parseCatalogSpreadsheet(matrix) {
+  return matrix
+    .filter((row) => Array.isArray(row) && row.some((value) => String(value || "").trim()))
+    .map((row) => ({
+      code: String(row[0] ?? "").trim().replace(/\./g, ""),
+      name: String(row[1] ?? "").trim(),
+      metric: String(row[2] ?? "").trim(),
+      priceA: String(row[3] ?? "").trim(),
+      priceB: String(row[4] ?? "").trim(),
+      group: String(row[5] ?? "").trim(),
+      subgroup: String(row[6] ?? "").trim(),
+      multiple: String(row[7] ?? "").trim(),
+      note: String(row[8] ?? "").trim()
+    }))
+    .filter((row) => {
+      const codeLike = /^\d{3,}$/.test(row.code);
+      const nameLike = /[a-zA-ZÀ-ÿ]/.test(row.name) && row.name.length > 4;
+      const metricLike = /^-?[\d.,]+$/.test(row.metric);
+      const priceALike = /^R\$\s*-?[\d.,]+$/.test(row.priceA) || /^-?[\d.,]+$/.test(row.priceA);
+      const priceBLike = /^R\$\s*-?[\d.,]+$/.test(row.priceB) || /^-?[\d.,]+$/.test(row.priceB);
+      return codeLike && nameLike && metricLike && priceALike && priceBLike;
+    });
+}
+
 async function readSpreadsheetFile(file, aliasesByField, kind) {
   if (typeof XLSX === "undefined") {
     throw new Error("Leitor de Excel indisponivel no momento. Recarregue a pagina e tente novamente.");
@@ -1824,6 +2081,11 @@ async function readSpreadsheetFile(file, aliasesByField, kind) {
 
   if (kind === "estoque") {
     return parseStockSpreadsheetByFixedColumns(matrix);
+  }
+
+  const catalogRows = parseCatalogSpreadsheet(matrix);
+  if (catalogRows.length) {
+    return catalogRows;
   }
 
   const candidateRows = matrix
@@ -1874,6 +2136,10 @@ async function readUploadedFile(file, aliasesByField, kind) {
     }
     return [];
   }
+  const salesBlockRows = parseSalesBlockText(text);
+  if (salesBlockRows.length) {
+    return salesBlockRows;
+  }
   return parseDelimitedText(text);
 }
 
@@ -1885,14 +2151,19 @@ async function loadDataset({ fileInput, textArea, aliases, kind }) {
     return null;
   }
 
-  const rows =
-    file
-      ? await readUploadedFile(file, aliases, kind)
-      : kind === "estoque"
-        ? parseStockTabbedRows(htmlToPlainText(pasted)).length
-          ? parseStockTabbedRows(htmlToPlainText(pasted))
-          : parseStockBlockText(htmlToPlainText(pasted))
-        : parseDelimitedText(pasted);
+  let rows;
+
+  if (file) {
+    rows = await readUploadedFile(file, aliases, kind);
+  } else if (kind === "estoque") {
+    const normalizedPasted = htmlToPlainText(pasted);
+    const tabbedRows = parseStockTabbedRows(normalizedPasted);
+    rows = tabbedRows.length ? tabbedRows : parseStockBlockText(normalizedPasted);
+  } else {
+    const normalizedPasted = htmlToPlainText(pasted);
+    const salesBlockRows = parseSalesBlockText(normalizedPasted);
+    rows = salesBlockRows.length ? salesBlockRows : parseDelimitedText(normalizedPasted);
+  }
 
   if (!rows.length) {
     throw new Error(
@@ -1937,6 +2208,88 @@ async function loadDataset({ fileInput, textArea, aliases, kind }) {
   return normalizedRows;
 }
 
+async function loadSpreadsheetDataset() {
+  const file = refs.spreadsheetFile?.files?.[0];
+  const pasted = String(refs.spreadsheetText?.value || "").trim();
+
+  if (!file && !pasted) {
+    return null;
+  }
+
+  let rows;
+
+  if (file) {
+    rows = await readUploadedFile(file, SALES_ALIASES, "vendas");
+  } else {
+    const normalizedPasted = htmlToPlainText(pasted);
+    const salesBlockRows = parseSalesBlockText(normalizedPasted);
+    const catalogBlockRows = salesBlockRows.length ? [] : parseCatalogBlockText(normalizedPasted);
+    rows = salesBlockRows.length ? salesBlockRows : catalogBlockRows.length ? catalogBlockRows : parseDelimitedText(normalizedPasted);
+  }
+
+  if (!rows || !rows.length) {
+    throw new Error("Nao foi possivel ler a planilha. Verifique se o conteudo possui linhas validas.");
+  }
+
+  const catalogRows = rows.filter((row) => row.priceA && row.priceB && row.metric != null && !row.date);
+  if (catalogRows.length === rows.length) {
+    return { mode: "catalog", rows: catalogRows };
+  }
+
+  const mappedColumns = findColumnByScore(rows, SALES_ALIASES);
+  const missing = Object.entries(mappedColumns)
+    .filter(([, column]) => !column)
+    .map(([field]) => field);
+
+  if (missing.length) {
+    throw new Error(`A planilha nao trouxe as colunas essenciais: ${missing.join(", ")}.`);
+  }
+
+  return {
+    mode: "sales",
+    rows: rows
+      .map((row) => ({
+      note: row.note ?? row.Nota ?? row.nota ?? "",
+      series: row.series ?? row["Série"] ?? row.Serie ?? row.serie ?? "",
+      date: row.date ?? row[mappedColumns.date] ?? "",
+      order: row.order ?? row.Pedido ?? row.pedido ?? "",
+      movementType: row.movementType ?? row["Tipo Mov."] ?? row["Tipo Mov"] ?? row.tipo ?? "",
+      code: row.code ?? row[mappedColumns.code] ?? "",
+      companyCode: row.companyCode ?? row["Cód.Empresa"] ?? row["Cod.Empresa"] ?? row.codEmpresa ?? "",
+      name: row.name ?? row[mappedColumns.name] ?? "",
+      group: row.group ?? row.Grupo ?? row.grupo ?? "",
+      subgroup: row.subgroup ?? row.Subgrupo ?? row.subgrupo ?? "",
+      intermediary: row.intermediary ?? row.Intermediador ?? row.intermediador ?? "",
+      paymentCondition: row.paymentCondition ?? row["Cond.Pgto"] ?? row["Cond.Pgto."] ?? "",
+      quantity: row.quantity ?? row[mappedColumns.quantity] ?? "",
+      value: row.value ?? row.Valor ?? row.valor ?? "",
+      totalWithIpi: row.totalWithIpi ?? row["Tot.Merc.+IPI"] ?? row.total ?? "",
+      cmv: row.cmv ?? row.CMV ?? "",
+      marginCtb: row.marginCtb ?? row["Margem Ctb"] ?? "",
+      marginCtbPercent: row.marginCtbPercent ?? row["% Mg Ctb"] ?? "",
+      cmvGer: row.cmvGer ?? row["CMV Ger."] ?? "",
+      marginGer: row.marginGer ?? row["Margem Ger"] ?? "",
+      grossMarginPercent: row.grossMarginPercent ?? row.marginGerPercent ?? row["% Mg Ger"] ?? row["% Mg Ctb"] ?? row["%mgger"] ?? row["% mg ger"] ?? "",
+      total: row.total ?? row.Total ?? "",
+      freight: row.freight ?? row.Frete ?? "",
+      expenses: row.expenses ?? row.Despesas ?? "",
+      insurance: row.insurance ?? row.Seguro ?? "",
+      ipiValue: row.ipiValue ?? row["Valor IPI"] ?? "",
+      discount: row.discount ?? row.Desconto ?? "",
+      cfop: row.cfop ?? row.CFOP ?? "",
+      cstOrigin: row.cstOrigin ?? row["CST Orig."] ?? row["CST Orig"] ?? "",
+      stock: row.stock ?? row.Estoque ?? "",
+      stValue: row.stValue ?? row["Valor ST"] ?? "",
+      customerCode: row.customerCode ?? row["Cód.Cliente"] ?? row["Cod.Cliente"] ?? "",
+      brand: row.brand ?? row.Marca ?? row.marca ?? "",
+      customer: row.customer ?? row.Cliente ?? row.cliente ?? "",
+      category: row.category ?? row.Categoria ?? row.categoria ?? "",
+      carrier: row.carrier ?? row.Transportadora ?? row.transportadora ?? ""
+      }))
+      .filter((row) => String(row.code || "").trim() && parseDate(row.date))
+  };
+}
+
 function setMessage(type, text) {
   refs.messageBox.className = `message-box ${type}`;
   refs.messageBox.textContent = text;
@@ -1951,7 +2304,7 @@ function nextPaint() {
 }
 
 function setProcessButtonsState(isProcessing) {
-  [refs.processButton, refs.processStockButton, refs.processSalesButton].forEach((button) => {
+  [refs.processButton, refs.processStockButton, refs.processSalesButton, refs.processSpreadsheetButton].forEach((button) => {
     if (!button) {
       return;
     }
@@ -2269,6 +2622,142 @@ function renderTable() {
     `;
 }
 
+function renderSpreadsheetTable() {
+  if (!refs.spreadsheetTableBody || !refs.spreadsheetTableHead) {
+    return;
+  }
+
+  if (!state.salesSheetRows.length) {
+    refs.spreadsheetTableHead.innerHTML = `
+      <tr>
+        ${SALES_ANALYTIC_COLUMNS.map((column) => `<th>${column.label}</th>`).join("")}
+      </tr>
+    `;
+    refs.spreadsheetTableBody.innerHTML = `
+      <tr>
+        <td colspan="${SALES_ANALYTIC_COLUMNS.length}" class="empty-state">Cole a planilha ou envie o arquivo para visualizar os itens importados.</td>
+      </tr>
+    `;
+    if (refs.spreadsheetRowCount) {
+      refs.spreadsheetRowCount.textContent = "0";
+    }
+    if (refs.spreadsheetOrderCount) {
+      refs.spreadsheetOrderCount.textContent = "0";
+    }
+    if (refs.spreadsheetSkuCount) {
+      refs.spreadsheetSkuCount.textContent = "0";
+    }
+    if (refs.spreadsheetGrossTotal) {
+      refs.spreadsheetGrossTotal.textContent = formatCurrency(0);
+    }
+    if (refs.spreadsheetStatus) {
+      refs.spreadsheetStatus.textContent = "Aguardando leitura";
+      refs.spreadsheetStatus.classList.remove("is-ready");
+    }
+    if (refs.spreadsheetDebug) {
+      refs.spreadsheetDebug.textContent = "Aguardando leitura do analitico.";
+    }
+    return;
+  }
+
+  const visibleRows = state.salesSheetRows.slice(0, PERFORMANCE_LIMITS.maxRenderedRows);
+  const uniqueOrders =
+    state.salesSheetMode === "sales"
+      ? new Set(state.salesSheetRows.map((row) => String(row.order || "").trim()).filter(Boolean)).size
+      : new Set(state.salesSheetRows.map((row) => String(row.group || "").trim()).filter(Boolean)).size;
+  const uniqueSkus = new Set(state.salesSheetRows.map((row) => String(row.code || "").trim()).filter(Boolean)).size;
+  const grossTotal =
+    state.salesSheetMode === "sales"
+      ? state.salesSheetRows.reduce(
+          (sum, row) =>
+            sum +
+            (row.totalWithIpi
+              ? parseNumber(row.totalWithIpi)
+              : parseNumber(row.value) * Math.max(parseNumber(row.quantity) || 1, 1)),
+          0
+        )
+      : state.salesSheetRows.reduce((sum, row) => sum + parseNumber(row.priceB || row.priceA), 0);
+
+  if (state.salesSheetMode === "sales") {
+    const visibleSalesRows = state.salesSheetRows.slice(0, PERFORMANCE_LIMITS.maxRenderedRows);
+    refs.spreadsheetTableHead.innerHTML = `
+      <tr>
+        ${SALES_ANALYTIC_COLUMNS.map((column) => `<th>${column.label}</th>`).join("")}
+      </tr>
+    `;
+    refs.spreadsheetTableBody.innerHTML = `${visibleSalesRows
+      .map(
+        (row) => `
+        <tr>
+          ${SALES_ANALYTIC_COLUMNS.map((column) => `<td>${formatSpreadsheetCell(column.key, row[column.key])}</td>`).join("")}
+        </tr>
+      `
+      )
+      .join("")}${
+      state.salesSheetRows.length > PERFORMANCE_LIMITS.maxRenderedRows
+        ? `<tr><td colspan="${SALES_ANALYTIC_COLUMNS.length}" class="empty-state">Exibindo ${formatInteger(PERFORMANCE_LIMITS.maxRenderedRows)} de ${formatInteger(state.salesSheetRows.length)} linhas do analítico.</td></tr>`
+        : ""
+    }`;
+  } else {
+    refs.spreadsheetTableHead.innerHTML = `
+      <tr>
+        <th>Codigo</th>
+        <th>Descricao</th>
+        <th>Indicador</th>
+        <th>Valor 1</th>
+        <th>Valor 2</th>
+        <th>Grupo</th>
+        <th>Subgrupo</th>
+        <th>Multiplo</th>
+        <th>Observacao</th>
+      </tr>
+    `;
+    refs.spreadsheetTableBody.innerHTML = `${visibleRows
+      .map(
+        (row) => `
+        <tr>
+          <td>${row.code || "-"}</td>
+          <td>${row.name || "-"}</td>
+          <td>${row.metric || "-"}</td>
+          <td>${row.priceA || "-"}</td>
+          <td>${row.priceB || "-"}</td>
+          <td>${row.group || "-"}</td>
+          <td>${row.subgroup || "-"}</td>
+          <td>${row.multiple || "-"}</td>
+          <td>${row.note || "-"}</td>
+        </tr>
+      `
+      )
+      .join("")}${
+      state.salesSheetRows.length > PERFORMANCE_LIMITS.maxRenderedRows
+        ? `<tr><td colspan="9" class="empty-state">Exibindo ${formatInteger(PERFORMANCE_LIMITS.maxRenderedRows)} de ${formatInteger(state.salesSheetRows.length)} linhas da planilha.</td></tr>`
+        : ""
+    }`;
+  }
+
+  if (refs.spreadsheetRowCount) {
+    refs.spreadsheetRowCount.textContent = formatInteger(state.salesSheetRows.length);
+  }
+  if (refs.spreadsheetOrderCount) {
+    refs.spreadsheetOrderCount.textContent = formatInteger(uniqueOrders);
+  }
+  if (refs.spreadsheetSkuCount) {
+    refs.spreadsheetSkuCount.textContent = formatInteger(uniqueSkus);
+  }
+  if (refs.spreadsheetGrossTotal) {
+    refs.spreadsheetGrossTotal.textContent = formatCurrency(grossTotal);
+  }
+  if (refs.spreadsheetStatus) {
+    refs.spreadsheetStatus.textContent = `${
+      state.salesSheetMode === "catalog" ? "Catalogo lido" : "Planilha lida"
+    } • ${formatInteger(state.salesSheetRows.length)} linhas`;
+    refs.spreadsheetStatus.classList.add("is-ready");
+  }
+  if (refs.spreadsheetDebug) {
+    refs.spreadsheetDebug.textContent = `mode: ${state.salesSheetMode}\n` + JSON.stringify(state.salesSheetRows[0], null, 2);
+  }
+}
+
 function resetState(options = {}) {
   const { clearSnapshot = false } = options;
   state.stockRows = [];
@@ -2292,6 +2781,12 @@ function resetState(options = {}) {
   refs.stockText.value = "";
   refs.salesText.value = "";
   refs.monitoredInput.value = "";
+  if (refs.spreadsheetFile) {
+    refs.spreadsheetFile.value = "";
+  }
+  if (refs.spreadsheetText) {
+    refs.spreadsheetText.value = "";
+  }
   refs.searchInput.value = "";
   refs.riskFilter.value = "all";
   refs.sortSelect.value = "projection";
@@ -2340,6 +2835,7 @@ function resetState(options = {}) {
   renderSavedOrders();
   renderImportHistory();
   renderPersistedProductCount();
+  renderSpreadsheetTable();
 }
 
 function createImportBatch(kind, rows, sourceName) {
@@ -2425,6 +2921,8 @@ async function handleProcess(mode) {
     saveProducts();
     renderPersistedProductCount();
     const shouldSyncProducts = state.persistedProducts.length <= PERFORMANCE_LIMITS.maxSupabaseUpsertRows;
+    const usedTrimmedLocalCache = state.persistedProducts.length > PERFORMANCE_LIMITS.maxLocalStorageProducts;
+    const usedTrimmedSnapshot = state.allProcessed.length > PERFORMANCE_LIMITS.maxLocalSnapshotRows;
     if (shouldSyncProducts) {
       await upsertProcessedProductsToSupabase(state.persistedProducts);
     }
@@ -2444,24 +2942,97 @@ async function handleProcess(mode) {
       setMessage(
         "success",
         shouldSyncProducts
-          ? "Relatorios de estoque e vendas processados com sucesso."
+          ? usedTrimmedLocalCache || usedTrimmedSnapshot
+            ? "Relatorios de estoque e vendas processados com sucesso. Para manter a interface rapida, o cache local foi reduzido."
+            : "Relatorios de estoque e vendas processados com sucesso."
           : "Relatorios processados com sucesso. A sincronizacao completa com o banco foi adiada para manter a interface rapida."
       );
     } else if (stockRows) {
       setMessage(
         "success",
         shouldSyncProducts
-          ? "Relatorio de estoque processado com sucesso."
+          ? usedTrimmedLocalCache || usedTrimmedSnapshot
+            ? "Relatorio de estoque processado com sucesso. Para manter a interface rapida, o cache local foi reduzido."
+            : "Relatorio de estoque processado com sucesso."
           : "Relatorio de estoque processado com sucesso. A sincronizacao completa com o banco foi adiada para manter a interface rapida."
       );
     } else {
-      setMessage("success", "Relatorio de vendas processado com sucesso.");
+      setMessage(
+        "success",
+        usedTrimmedLocalCache || usedTrimmedSnapshot
+          ? "Relatorio de vendas processado com sucesso. Para manter a interface rapida, o cache local foi reduzido."
+          : "Relatorio de vendas processado com sucesso."
+      );
     }
   } catch (error) {
     setMessage("error", error.message || "Falha ao processar os relatorios.");
   } finally {
     setProcessButtonsState(false);
   }
+}
+
+async function handleProcessSpreadsheet() {
+  try {
+    setProcessButtonsState(true);
+    setMessage("info", "Lendo a planilha comercial para consolidar a aba dedicada...");
+    await nextPaint();
+
+    const dataset = await loadSpreadsheetDataset();
+    const rows = dataset?.rows || [];
+
+    if (!rows || !rows.length) {
+      throw new Error("Nenhuma linha valida foi encontrada na planilha.");
+    }
+
+    state.salesSheetRows = rows;
+    state.salesSheetMode = dataset.mode || "sales";
+    state.salesRows =
+      state.salesSheetMode === "sales"
+        ? rows.map((row) => ({
+            date: row.date,
+            code: row.code,
+            name: row.name,
+            quantity: row.quantity
+          }))
+        : [];
+    state.salesLoaded = state.salesSheetMode === "sales";
+
+    if (state.salesSheetMode === "sales") {
+      setStatus(refs.salesStatus, "Carregado", true);
+      processData();
+      updateSummary();
+      renderTable();
+    }
+    renderSpreadsheetTable();
+    if (state.salesSheetMode === "sales") {
+      saveProcessedSnapshot();
+      await registerImport("vendas", state.salesRows, getSourceName(refs.spreadsheetFile, "Planilha colada"));
+    }
+    setMessage(
+      "success",
+      state.salesSheetMode === "catalog"
+        ? "Catalogo processado com sucesso na aba dedicada."
+        : "Planilha processada com sucesso na aba dedicada."
+    );
+  } catch (error) {
+    renderSpreadsheetTable();
+    setMessage("error", error.message || "Falha ao processar a planilha.");
+  } finally {
+    setProcessButtonsState(false);
+  }
+}
+
+function handleClearSpreadsheet() {
+  state.salesSheetRows = [];
+  state.salesSheetMode = "empty";
+  if (refs.spreadsheetFile) {
+    refs.spreadsheetFile.value = "";
+  }
+  if (refs.spreadsheetText) {
+    refs.spreadsheetText.value = "";
+  }
+  renderSpreadsheetTable();
+  setMessage("info", "Leitura da planilha limpa.");
 }
 
 function handleProcessStock() {
@@ -2540,6 +3111,8 @@ function on(element, eventName, handler) {
 on(refs.processButton, "click", handleProcessBoth);
 on(refs.processStockButton, "click", handleProcessStock);
 on(refs.processSalesButton, "click", handleProcessSales);
+on(refs.processSpreadsheetButton, "click", handleProcessSpreadsheet);
+on(refs.clearSpreadsheetButton, "click", handleClearSpreadsheet);
 on(refs.clearButton, "click", () => resetState({ clearSnapshot: true }));
 on(refs.searchInput, "input", renderTable);
 on(refs.riskFilter, "change", renderTable);
@@ -2581,6 +3154,15 @@ on(refs.salesFile, "change", () => {
     setDashboardSourceStatus("vendas", `${refs.salesFile.files[0].name} - pronto para processar`);
   }
 });
+on(refs.spreadsheetFile, "change", () => {
+  if (refs.spreadsheetFile.files?.[0] && refs.spreadsheetStatus) {
+    refs.spreadsheetStatus.textContent = refs.spreadsheetFile.files[0].name;
+    refs.spreadsheetStatus.classList.add("is-ready");
+    if (refs.spreadsheetText) {
+      refs.spreadsheetText.value = "";
+    }
+  }
+});
 refs.tabButtons.forEach((button) => {
   button.addEventListener("click", () => setActiveTab(button.dataset.tabTarget));
 });
@@ -2608,6 +3190,7 @@ async function initializeApp() {
   renderSavedOrders();
   renderImportHistory();
   renderPersistedProductCount();
+  renderSpreadsheetTable();
   clearProcessedSnapshot();
 }
 
