@@ -189,33 +189,30 @@ function parseStockBlockText(text) {
   }
 
   const rows = [];
-  for (let index = 0; index <= lines.length - 5; index += 1) {
-    const warehouse = lines[index];
-    const code = lines[index + 1];
-    const sku = lines[index + 2];
-    const name = lines[index + 3];
-    const stock = lines[index + 4];
+  for (let index = 0; index <= lines.length - 5; ) {
+    const chunk = lines.slice(index, index + 9);
+    const [warehouse, code, sku, name, , extra1, extra2, extra3, extra4] = chunk;
+    const stock = extra4 ?? extra3 ?? extra2 ?? extra1 ?? "";
+    const warehouseLike = /galpao|galpão|armazem|armazém|deposito|depósito|centro|filial/i.test(warehouse);
+    const codeLike = /^\d{4,}$/.test(code);
+    const skuLike = /[a-z]/i.test(sku) && !/^\d+$/.test(sku);
+    const nameLike = /[a-z]/i.test(name) && name.length > 4;
+    const stockLike = /^-?\d+[.,]?\d*$/.test(String(stock));
+    const trailingNumbers = chunk.slice(5, 9).filter((value) => /^-?\d+[.,]?\d*$/.test(String(value || "")));
 
-    const looksLikeBlock =
-      /galpao|galpão|armazem|armazém|deposito|depósito/i.test(warehouse) &&
-      /^\d{4,}$/.test(code) &&
-      /[a-z]/i.test(sku) &&
-      /[a-z]/i.test(name) &&
-      /^-?\d+[.,]?\d*$/.test(String(stock));
-
-    if (!looksLikeBlock) {
+    if (warehouseLike && codeLike && skuLike && nameLike && stockLike) {
+      rows.push({ warehouse, code, sku, name, stock });
+      index += trailingNumbers.length === 4 ? 9 : 5;
       continue;
     }
 
-    rows.push({
-      warehouse,
-      code,
-      sku,
-      name,
-      stock
-    });
+    if (codeLike && skuLike && nameLike && stockLike) {
+      rows.push({ warehouse: "", code: warehouse, sku: code, name: sku, stock: name });
+      index += 4;
+      continue;
+    }
 
-    index += 4;
+    index += 1;
   }
 
   return rows;
