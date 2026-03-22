@@ -206,9 +206,23 @@ function parseStockBlockText(text) {
       continue;
     }
 
-    if (codeLike && skuLike && nameLike && stockLike) {
-      rows.push({ warehouse: "", code: warehouse, sku: code, name: sku, stock: name });
-      index += 4;
+    const chunkWithoutWarehouse = lines.slice(index, index + 8);
+    const [codeOnly, skuOnly, nameOnly, ignoredValue, tail1, tail2, tail3, tail4] = chunkWithoutWarehouse;
+    const codeOnlyLike = /^\d{4,}$/.test(codeOnly);
+    const skuOnlyLike = /[a-z]/i.test(skuOnly) && !/^\d+$/.test(skuOnly);
+    const nameOnlyLike = /[a-z]/i.test(nameOnly) && nameOnly.length > 4;
+    const tailStock = tail4 ?? tail3 ?? tail2 ?? tail1 ?? "";
+    const tailStockLike = /^-?\d+[.,]?\d*$/.test(String(tailStock));
+
+    if (codeOnlyLike && skuOnlyLike && nameOnlyLike && tailStockLike) {
+      rows.push({
+        warehouse: "",
+        code: codeOnly,
+        sku: skuOnly,
+        name: nameOnly,
+        stock: tailStock
+      });
+      index += 8;
       continue;
     }
 
