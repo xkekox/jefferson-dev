@@ -44,7 +44,6 @@ const refs = {
   currentMonthProjection: document.getElementById("currentMonthProjection"),
   dashboardStockStatus: document.getElementById("dashboardStockStatus"),
   dashboardSalesStatus: document.getElementById("dashboardSalesStatus"),
-  dashboardDatabaseStatus: document.getElementById("dashboardDatabaseStatus"),
   dashboardProductBaseCount: document.getElementById("dashboardProductBaseCount"),
   supabaseUrlInput: document.getElementById("supabaseUrlInput"),
   supabaseAnonKeyInput: document.getElementById("supabaseAnonKeyInput"),
@@ -332,9 +331,22 @@ function writeStorage(key, value) {
 }
 
 function updateDatabaseStatus(label) {
-  if (refs.dashboardDatabaseStatus) {
-    refs.dashboardDatabaseStatus.textContent = label;
+  return label;
+}
+
+function setDashboardSourceStatus(kind, label) {
+  if (kind === "estoque" && refs.dashboardStockStatus) {
+    refs.dashboardStockStatus.textContent = label;
   }
+  if (kind === "vendas" && refs.dashboardSalesStatus) {
+    refs.dashboardSalesStatus.textContent = label;
+  }
+}
+
+function buildSourceStatusLabel(sourceName, rowCount) {
+  const safeSource = sourceName || "Manual";
+  const safeRows = Number(rowCount || 0);
+  return `${safeSource} • ${formatInteger(safeRows)} linhas`;
 }
 
 function getSupabaseConfig() {
@@ -1373,8 +1385,6 @@ function updateSummary() {
   refs.currentMonthSales.textContent = formatInteger(totalCurrentSales);
   refs.currentMonthProjection.textContent = formatInteger(totalProjection);
   refs.monthsLabel.textContent = state.months.map((key) => monthLabel(key)).join(" | ");
-  refs.dashboardStockStatus.textContent = state.stockLoaded ? "Carregado" : "Aguardando";
-  refs.dashboardSalesStatus.textContent = state.salesLoaded ? "Carregado" : "Aguardando";
   renderMonitorList();
 }
 
@@ -1550,8 +1560,8 @@ function resetState() {
 
   setStatus(refs.stockStatus, "Aguardando", false);
   setStatus(refs.salesStatus, "Aguardando", false);
-  refs.dashboardStockStatus.textContent = "Aguardando";
-  refs.dashboardSalesStatus.textContent = "Aguardando";
+  refs.dashboardStockStatus.textContent = "Sem leitura";
+  refs.dashboardSalesStatus.textContent = "Sem leitura";
   refs.dashboardProductBaseCount.textContent = "0";
   setMessage("info", "Carregue um ou ambos os relatorios para montar a visao operacional de Zain na Pichau.");
 
@@ -1590,6 +1600,7 @@ async function registerImport(kind, rows, sourceName) {
   state.importHistory = [batch, ...state.importHistory].slice(0, 12);
   saveImports();
   renderImportHistory();
+  setDashboardSourceStatus(kind, buildSourceStatusLabel(batch.sourceName, batch.rowCount));
   await insertImportBatchToSupabase(batch);
 }
 
@@ -1692,10 +1703,12 @@ async function handleExample(kind) {
       refs.stockText.value = content;
       refs.stockFile.value = "";
       setStatus(refs.stockStatus, "Exemplo carregado", true);
+      setDashboardSourceStatus("estoque", "Exemplo carregado");
     } else {
       refs.salesText.value = content;
       refs.salesFile.value = "";
       setStatus(refs.salesStatus, "Exemplo carregado", true);
+      setDashboardSourceStatus("vendas", "Exemplo carregado");
     }
 
     setMessage("info", `Exemplo de ${kind} carregado. Agora processe os relatorios.`);
@@ -1760,12 +1773,14 @@ refs.stockFile.addEventListener("change", () => {
   if (refs.stockFile.files?.[0]) {
     setStatus(refs.stockStatus, refs.stockFile.files[0].name, true);
     refs.stockText.value = "";
+    setDashboardSourceStatus("estoque", `${refs.stockFile.files[0].name} - pronto para processar`);
   }
 });
 refs.salesFile.addEventListener("change", () => {
   if (refs.salesFile.files?.[0]) {
     setStatus(refs.salesStatus, refs.salesFile.files[0].name, true);
     refs.salesText.value = "";
+    setDashboardSourceStatus("vendas", `${refs.salesFile.files[0].name} - pronto para processar`);
   }
 });
 refs.tabButtons.forEach((button) => {
