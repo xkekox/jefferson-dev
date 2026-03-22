@@ -123,6 +123,12 @@ const PERSISTENCE = {
   scope: "zain-pichau-console"
 };
 
+const PERFORMANCE_LIMITS = {
+  maxRenderedRows: 300,
+  maxSupabaseUpsertRows: 5000,
+  maxImportPayloadRows: 0
+};
+
 function normalizeKey(value) {
   return String(value || "")
     .normalize("NFD")
@@ -2102,9 +2108,14 @@ function renderTable() {
 
   buildTableHead();
   const rows = filteredRows();
+  const visibleRows = rows.slice(0, PERFORMANCE_LIMITS.maxRenderedRows);
 
   refs.tableBody.innerHTML = rows.length
-    ? rows.map(buildRow).join("")
+    ? `${visibleRows.map(buildRow).join("")}${
+        rows.length > PERFORMANCE_LIMITS.maxRenderedRows
+          ? `<tr><td colspan="14" class="empty-state">Exibindo ${formatInteger(PERFORMANCE_LIMITS.maxRenderedRows)} de ${formatInteger(rows.length)} itens para manter o dashboard responsivo. Use a busca para refinar.</td></tr>`
+          : ""
+      }`
     : `
       <tr>
         <td colspan="14" class="empty-state">Nenhum item encontrado com os filtros atuais.</td>
@@ -2178,7 +2189,7 @@ function createImportBatch(kind, rows, sourceName) {
     sourceName: sourceName || "Manual",
     rowCount: rows.length,
     createdAt: new Date().toISOString(),
-    payload: rows
+    payload: PERFORMANCE_LIMITS.maxImportPayloadRows > 0 ? rows.slice(0, PERFORMANCE_LIMITS.maxImportPayloadRows) : []
   };
 }
 
@@ -2251,7 +2262,10 @@ async function handleProcess(mode) {
     }));
     saveProducts();
     renderPersistedProductCount();
-    await upsertProcessedProductsToSupabase(state.persistedProducts);
+    const shouldSyncProducts = state.persistedProducts.length <= PERFORMANCE_LIMITS.maxSupabaseUpsertRows;
+    if (shouldSyncProducts) {
+      await upsertProcessedProductsToSupabase(state.persistedProducts);
+    }
     updateSummary();
     renderTable();
     saveProcessedSnapshot();
@@ -2265,9 +2279,19 @@ async function handleProcess(mode) {
     }
 
     if (stockRows && salesRows) {
-      setMessage("success", "Relatorios de estoque e vendas processados com sucesso.");
+      setMessage(
+        "success",
+        shouldSyncProducts
+          ? "Relatorios de estoque e vendas processados com sucesso."
+          : "Relatorios processados com sucesso. A sincronizacao completa com o banco foi adiada para manter a interface rapida."
+      );
     } else if (stockRows) {
-      setMessage("success", "Relatorio de estoque processado com sucesso.");
+      setMessage(
+        "success",
+        shouldSyncProducts
+          ? "Relatorio de estoque processado com sucesso."
+          : "Relatorio de estoque processado com sucesso. A sincronizacao completa com o banco foi adiada para manter a interface rapida."
+      );
     } else {
       setMessage("success", "Relatorio de vendas processado com sucesso.");
     }
