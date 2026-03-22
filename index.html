@@ -98,6 +98,10 @@
               <span>Buscar por codigo ou SKU</span>
               <input id="productSearch" type="search" placeholder="Ex.: 38229 ou TGT-LGN-BK" />
             </label>
+            <div class="search-actions">
+              <button id="searchButton" class="button button-primary" type="button">Buscar produto</button>
+              <button id="clearSearchButton" class="button button-secondary" type="button">Limpar busca</button>
+            </div>
             <label class="sector-field">
               <span>Selecionar setor</span>
               <select id="sectorFilter">
@@ -123,6 +127,7 @@
               </select>
             </label>
           </div>
+          <p class="table-hint">Quando voce buscar por codigo ou SKU, os demais filtros deixam de interferir.</p>
           <div id="sectorChips" class="sector-chips"></div>
         </div>
       </section>
