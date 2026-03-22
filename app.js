@@ -3,6 +3,7 @@ const state = {
   salesRows: [],
   stockLoaded: false,
   salesLoaded: false,
+  allProcessed: [],
   processed: [],
   months: [],
   monitoredTerms: [],
@@ -22,6 +23,8 @@ const refs = {
   salesText: document.getElementById("salesText"),
   stockStatus: document.getElementById("stockStatus"),
   salesStatus: document.getElementById("salesStatus"),
+  stockStatusMirror: document.getElementById("stockStatusMirror"),
+  salesStatusMirror: document.getElementById("salesStatusMirror"),
   stockExampleButton: document.getElementById("stockExampleButton"),
   salesExampleButton: document.getElementById("salesExampleButton"),
   processStockButton: document.getElementById("processStockButton"),
@@ -38,6 +41,7 @@ const refs = {
   stockSkuCount: document.getElementById("stockSkuCount"),
   stockPositiveCount: document.getElementById("stockPositiveCount"),
   stockZeroCount: document.getElementById("stockZeroCount"),
+  consolidatedCatalogBody: document.getElementById("consolidatedCatalogBody"),
   importHistoryBody: document.getElementById("importHistoryBody"),
   tableHead: document.getElementById("tableHead"),
   tableBody: document.getElementById("tableBody"),
@@ -45,9 +49,13 @@ const refs = {
   totalStock: document.getElementById("totalStock"),
   currentMonthSales: document.getElementById("currentMonthSales"),
   currentMonthProjection: document.getElementById("currentMonthProjection"),
+  dashboardBaseSummary: document.getElementById("dashboardBaseSummary"),
+  dashboardStockBreakdown: document.getElementById("dashboardStockBreakdown"),
+  dashboardUnitsSummary: document.getElementById("dashboardUnitsSummary"),
   dashboardStockStatus: document.getElementById("dashboardStockStatus"),
   dashboardSalesStatus: document.getElementById("dashboardSalesStatus"),
   dashboardProductBaseCount: document.getElementById("dashboardProductBaseCount"),
+  dashboardProductBaseCountMirror: document.getElementById("dashboardProductBaseCountMirror"),
   supabaseUrlInput: document.getElementById("supabaseUrlInput"),
   supabaseAnonKeyInput: document.getElementById("supabaseAnonKeyInput"),
   saveSupabaseConfigButton: document.getElementById("saveSupabaseConfigButton"),
@@ -1031,6 +1039,7 @@ function saveProducts() {
 
 function saveProcessedSnapshot() {
   writeStorage(STORAGE_KEYS.processedSnapshot, {
+    allProcessed: state.allProcessed,
     processed: state.processed,
     months: state.months,
     monitoredInput: refs.monitoredInput?.value || "",
@@ -1107,13 +1116,11 @@ function hydrateFromPersistedProducts() {
   const currentMonthKey = monthKeys[2];
 
   state.months = monthKeys;
-  state.monitoredTerms = getMonitoredTerms();
   state.stockRows = [];
   state.salesRows = [];
   state.stockLoaded = false;
   state.salesLoaded = false;
-  state.processed = state.persistedProducts
-    .filter((product) => matchesMonitoredTerms(product, state.monitoredTerms))
+  state.allProcessed = state.persistedProducts
     .map((product) => {
       const config = getProductConfig(product.code);
       const projection = Number(product.projection || 0);
@@ -1150,11 +1157,10 @@ function hydrateFromPersistedProducts() {
       };
     });
 
+  applyMonitoredFilter();
   refs.dashboardStockStatus.textContent = "Base persistida";
   refs.dashboardSalesStatus.textContent = "Base persistida";
   updateSummary();
-  renderTable();
-  renderMonitorList();
   return true;
 }
 
@@ -1224,6 +1230,14 @@ function matchesMonitoredTerms(product, terms) {
 
   const haystack = `${product.code} ${product.sku || ""} ${product.name}`.toLowerCase();
   return terms.some((term) => haystack.includes(term));
+}
+
+function applyMonitoredFilter() {
+  state.monitoredTerms = getMonitoredTerms();
+  state.processed = state.allProcessed.filter((product) => matchesMonitoredTerms(product, state.monitoredTerms));
+  renderConsolidatedCatalog();
+  renderMonitorList();
+  renderTable();
 }
 
 function getProductConfig(code) {
@@ -1432,25 +1446,69 @@ function renderImportHistory() {
     .join("");
 }
 
+function renderConsolidatedCatalog() {
+  if (!refs.consolidatedCatalogBody) {
+    return;
+  }
+
+  const rows = (state.allProcessed.length ? state.allProcessed : state.processed)
+    .slice()
+    .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
+
+  if (!rows.length) {
+    refs.consolidatedCatalogBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="empty-state">Carregue estoque e vendas para montar a lista de consulta.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  const visibleRows = rows.slice(0, PERFORMANCE_LIMITS.maxRenderedRows);
+  refs.consolidatedCatalogBody.innerHTML = `${visibleRows
+    .map((item) => `
+      <tr>
+        <td>${item.code || "-"}</td>
+        <td>${item.sku || item.code || "-"}</td>
+        <td>${item.name || "-"}</td>
+        <td>${formatInteger(item.stock || 0)}</td>
+      </tr>
+    `)
+    .join("")}${
+    rows.length > PERFORMANCE_LIMITS.maxRenderedRows
+      ? `<tr><td colspan="4" class="empty-state">Exibindo ${formatInteger(PERFORMANCE_LIMITS.maxRenderedRows)} de ${formatInteger(rows.length)} produtos. Use o monitoramento para refinar a busca.</td></tr>`
+      : ""
+  }`;
+}
+
 function renderPersistedProductCount() {
   if (refs.dashboardProductBaseCount) {
     refs.dashboardProductBaseCount.textContent = formatInteger(state.persistedProducts.length);
   }
+  if (refs.dashboardProductBaseCountMirror) {
+    refs.dashboardProductBaseCountMirror.textContent = formatInteger(state.persistedProducts.length);
+  }
 }
 
 function restoreProcessedSnapshot(snapshot) {
-  if (!snapshot || !Array.isArray(snapshot.processed) || !snapshot.processed.length) {
+  const baseRows =
+    Array.isArray(snapshot?.allProcessed) && snapshot.allProcessed.length
+      ? snapshot.allProcessed
+      : Array.isArray(snapshot?.processed) && snapshot.processed.length
+        ? snapshot.processed
+        : [];
+
+  if (!baseRows.length) {
     return false;
   }
 
-  state.processed = snapshot.processed;
+  state.allProcessed = baseRows;
   state.months = Array.isArray(snapshot.months) ? snapshot.months : [];
   refs.monitoredInput.value = snapshot.monitoredInput || "";
   refs.dashboardStockStatus.textContent = snapshot.stockStatus || "Sem leitura";
   refs.dashboardSalesStatus.textContent = snapshot.salesStatus || "Sem leitura";
+  applyMonitoredFilter();
   updateSummary();
-  renderTable();
-  renderMonitorList();
   return true;
 }
 
@@ -1710,6 +1768,15 @@ function htmlToPlainText(text) {
     .join("\n");
 }
 
+function isStockValuePresent(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return false;
+  }
+
+  return /^-?[\d.,]+$/.test(raw);
+}
+
 function parseStockSpreadsheetByFixedColumns(matrix) {
   return matrix
     .map((row) => ({
@@ -1730,7 +1797,12 @@ function parseStockSpreadsheetByFixedColumns(matrix) {
         normalizedName.includes("descricao") ||
         normalizedStock.includes("estoque");
 
-      return !headerLike && Boolean(row.code) && (Boolean(row.name) || Boolean(row.sku));
+      const codeLike = /^\d{4,}$/.test(row.code);
+      const skuLike = Boolean(row.sku) && normalizedSku !== "sku";
+      const nameLike = Boolean(row.name) && !normalizedName.includes("descricao");
+      const stockLike = isStockValuePresent(row.stock);
+
+      return !headerLike && codeLike && skuLike && nameLike && stockLike;
     });
 }
 
@@ -1889,8 +1961,22 @@ function setProcessButtonsState(isProcessing) {
 }
 
 function setStatus(element, label, loaded) {
+  if (!element) {
+    return;
+  }
+
   element.textContent = label;
   element.classList.toggle("is-ready", loaded);
+
+  if (element === refs.stockStatus && refs.stockStatusMirror) {
+    refs.stockStatusMirror.textContent = label;
+    refs.stockStatusMirror.classList.toggle("is-ready", loaded);
+  }
+
+  if (element === refs.salesStatus && refs.salesStatusMirror) {
+    refs.salesStatusMirror.textContent = label;
+    refs.salesStatusMirror.classList.toggle("is-ready", loaded);
+  }
 }
 
 async function loadExample(kind) {
@@ -1914,7 +2000,6 @@ function processData() {
   const currentMonthKey = monthKeys[2];
   const businessDaysElapsed = countBusinessDaysElapsed(referenceDate);
   const businessDaysTotal = countBusinessDaysInMonth(referenceDate);
-  const monitoredTerms = getMonitoredTerms();
   const products = new Map();
 
   for (const item of state.stockRows) {
@@ -1965,9 +2050,7 @@ function processData() {
   }
 
   state.months = monthKeys;
-  state.monitoredTerms = monitoredTerms;
-  state.processed = Array.from(products.values())
-    .filter((product) => matchesMonitoredTerms(product, monitoredTerms))
+  state.allProcessed = Array.from(products.values())
     .map((product) => {
       const config = getProductConfig(product.code);
       const currentSales = product.monthlySales[currentMonthKey] || 0;
@@ -1995,27 +2078,39 @@ function processData() {
       };
     });
 
-  if (!state.processed.length) {
+  if (!state.allProcessed.length) {
     throw new Error(
       "Nenhum produto consolidado foi encontrado. Verifique se o relatorio possui codigo do produto e valores nas colunas esperadas."
     );
   }
 
-  renderMonitorList();
+  applyMonitoredFilter();
 }
 
 function updateSummary() {
-  const totalProducts = state.processed.length;
-  const totalStock = state.processed.reduce((sum, item) => sum + item.stock, 0);
-  const totalCurrentSales = state.processed.reduce((sum, item) => sum + item.currentSales, 0);
-  const totalProjection = state.processed.reduce((sum, item) => sum + item.projection, 0);
+  const summaryBase = state.allProcessed.length ? state.allProcessed : state.processed;
+  const totalProducts = summaryBase.length;
+  const totalStock = summaryBase.reduce((sum, item) => sum + item.stock, 0);
+  const totalCurrentSales = summaryBase.reduce((sum, item) => sum + item.currentSales, 0);
+  const totalProjection = summaryBase.reduce((sum, item) => sum + item.projection, 0);
+  const productsWithStock = summaryBase.filter((item) => Number(item.stock) > 0).length;
+  const productsWithoutStock = summaryBase.filter((item) => Number(item.stock) <= 0).length;
 
   refs.productCount.textContent = formatInteger(totalProducts);
   refs.totalStock.textContent = formatInteger(totalStock);
   refs.currentMonthSales.textContent = formatInteger(totalCurrentSales);
   refs.currentMonthProjection.textContent = formatInteger(totalProjection);
+  if (refs.dashboardBaseSummary) {
+    refs.dashboardBaseSummary.textContent = `${formatInteger(totalProducts)} produtos consolidados`;
+  }
+  if (refs.dashboardStockBreakdown) {
+    refs.dashboardStockBreakdown.textContent = `${formatInteger(productsWithStock)} com estoque | ${formatInteger(productsWithoutStock)} sem estoque`;
+  }
+  if (refs.dashboardUnitsSummary) {
+    refs.dashboardUnitsSummary.textContent = `${formatInteger(totalStock)} unidades em estoque`;
+  }
   refs.monthsLabel.textContent = state.months.map((key) => monthLabel(key)).join(" | ");
-  renderMonitorList();
+  renderConsolidatedCatalog();
 }
 
 function updateStockHealthSummary() {
@@ -2180,6 +2275,7 @@ function resetState(options = {}) {
   state.salesRows = [];
   state.stockLoaded = false;
   state.salesLoaded = false;
+  state.allProcessed = [];
   state.processed = [];
   state.months = [];
   state.monitoredTerms = [];
@@ -2213,6 +2309,9 @@ function resetState(options = {}) {
   refs.dashboardStockStatus.textContent = "Sem leitura";
   refs.dashboardSalesStatus.textContent = "Sem leitura";
   refs.dashboardProductBaseCount.textContent = "0";
+  if (refs.dashboardProductBaseCountMirror) {
+    refs.dashboardProductBaseCountMirror.textContent = "0";
+  }
   refs.stockSkuCount.textContent = "0";
   refs.stockPositiveCount.textContent = "0";
   refs.stockZeroCount.textContent = "0";
@@ -2222,7 +2321,17 @@ function resetState(options = {}) {
   refs.totalStock.textContent = "0";
   refs.currentMonthSales.textContent = "0";
   refs.currentMonthProjection.textContent = "0";
+  if (refs.dashboardBaseSummary) {
+    refs.dashboardBaseSummary.textContent = "0 produtos consolidados";
+  }
+  if (refs.dashboardStockBreakdown) {
+    refs.dashboardStockBreakdown.textContent = "0 com estoque | 0 sem estoque";
+  }
+  if (refs.dashboardUnitsSummary) {
+    refs.dashboardUnitsSummary.textContent = "0 unidades em estoque";
+  }
   refs.monthsLabel.textContent = "Ultimos 3 meses ainda nao carregados.";
+  renderConsolidatedCatalog();
   renderTable();
   renderMonitorList();
   renderOrderForm();
@@ -2393,10 +2502,22 @@ function reprocessIfLoaded() {
   if (state.stockRows.length || state.salesRows.length) {
     processData();
     updateSummary();
-    renderTable();
     saveProcessedSnapshot();
   }
 }
+
+function debounce(fn, wait = 120) {
+  let timeoutId;
+  return (...args) => {
+    window.clearTimeout(timeoutId);
+    timeoutId = window.setTimeout(() => fn(...args), wait);
+  };
+}
+
+const handleMonitoredInput = debounce(() => {
+  applyMonitoredFilter();
+  saveProcessedSnapshot();
+}, 120);
 
 function handleConfigChange(event) {
   const target = event.target;
@@ -2423,7 +2544,7 @@ on(refs.clearButton, "click", () => resetState({ clearSnapshot: true }));
 on(refs.searchInput, "input", renderTable);
 on(refs.riskFilter, "change", renderTable);
 on(refs.sortSelect, "change", renderTable);
-on(refs.monitoredInput, "input", reprocessIfLoaded);
+on(refs.monitoredInput, "input", handleMonitoredInput);
 on(refs.tableBody, "change", handleConfigChange);
 on(refs.tableBody, "input", (event) => {
   if (event.target.dataset.configField === "ignoreReason") {

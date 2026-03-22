@@ -6,260 +6,356 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <title>Zain | Pichau Procurement Console</title>
+    <title>Zain | Pichau | Console de Compras</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260322k" />
+    <link rel="stylesheet" href="./styles.css?v=20260322m" />
   </head>
   <body>
-    <div class="console-shell">
-      <aside class="sidebar">
-        <div class="brand-panel">
-          <p class="brand-kicker">Pichau Procurement Console</p>
-          <h1>Zain</h1>
-          <p class="brand-subtitle">Pichau | Compra e venda de gabinetes</p>
-          <div class="brand-inline-meta">
-            <span>Categoria: Gabinetes</span>
-            <span>Modo: Operacao</span>
-            <span>Fonte: ERP</span>
+    <div class="app-shell">
+      <aside class="nav-rail">
+        <div class="rail-brand">
+          <div class="rail-mark">ZP</div>
+          <div>
+            <p class="eyebrow">Ambiente de compras</p>
+            <h1>Zain | Pichau</h1>
           </div>
         </div>
+
+        <div class="rail-context">
+          <p class="eyebrow">Contexto</p>
+          <strong>Compras, estoque e reposicao</strong>
+          <span>Console interno para leitura de giro, ruptura, monitoramento e pedidos.</span>
+        </div>
+
+        <section class="rail-section">
+          <p class="rail-section-title">Areas do sistema</p>
+          <nav class="tabs-nav" aria-label="Secoes principais">
+            <button class="tab-button is-active" type="button" data-tab-target="dashboard">Dashboard</button>
+            <button class="tab-button" type="button" data-tab-target="importacao">Importacao</button>
+            <button class="tab-button" type="button" data-tab-target="monitoramento">Monitoramento</button>
+            <button class="tab-button" type="button" data-tab-target="pedidos">Pedidos</button>
+          </nav>
+        </section>
+
+        <section class="rail-section">
+          <p class="rail-section-title">Resumo operacional</p>
+          <div class="rail-summary">
+            <article class="rail-chip">
+              <span>Modo</span>
+              <strong>Operacao interna</strong>
+            </article>
+            <article class="rail-chip">
+              <span>Base de estoque</span>
+              <strong id="dashboardStockStatus">Sem leitura</strong>
+            </article>
+            <article class="rail-chip">
+              <span>Base persistida</span>
+              <strong id="dashboardProductBaseCount">0</strong>
+            </article>
+          </div>
+        </section>
       </aside>
 
-      <main class="workspace">
+      <main class="main-stage">
         <header class="topbar">
-          <div>
-            <p class="topbar-kicker">Operacao de compras</p>
-            <h2>Painel de decisao para gabinetes</h2>
+          <div class="topbar-main">
+            <div>
+              <p class="eyebrow">Console corporativo de compras</p>
+              <h2>Sistema de gestao de compras Zain</h2>
+            </div>
+            <p class="topbar-text">
+              Produto interno para consolidar importacoes do ERP, leitura de giro, priorizacao de ruptura e preparo de pedidos.
+            </p>
           </div>
-          <div class="topbar-status">
-            <span class="status-dot"></span>
-            Leitura operacional
+
+          <div class="topbar-side">
+            <div class="live-status">
+              <span class="status-dot"></span>
+              <span>Ambiente ativo</span>
+            </div>
+            <p id="monthsLabel" class="live-meta">Ultimos 3 meses ainda nao carregados.</p>
+            <strong id="dashboardSalesStatus" class="live-value">Sem leitura de vendas</strong>
+            <div class="live-mini-grid">
+              <div>
+                <span>Comprador</span>
+                <strong>Zain</strong>
+              </div>
+              <div>
+                <span>Fornecedor</span>
+                <strong>Pichau</strong>
+              </div>
+            </div>
           </div>
         </header>
 
-        <nav class="tabs-nav" aria-label="Secoes principais">
-          <button class="tab-button is-active" type="button" data-tab-target="dashboard">Dashboard</button>
-          <button class="tab-button" type="button" data-tab-target="importacao">Importacao</button>
-          <button class="tab-button" type="button" data-tab-target="monitoramento">Monitoramento</button>
-          <button class="tab-button" type="button" data-tab-target="pedidos">Pedidos</button>
-        </nav>
+        <section class="command-bar">
+          <div class="command-bar-copy">
+            <span class="command-tag">Ambiente atual</span>
+            <strong>Compra e giro de gabinetes</strong>
+          </div>
+          <div class="command-bar-meta">
+              <span>Estoque e vendas em uma superficie unica de decisao</span>
+          </div>
+        </section>
 
         <section class="tab-panel is-active" data-tab-panel="dashboard">
-          <section class="results-section dashboard-section">
-            <div class="section-header">
-              <div>
-                <p class="section-kicker">Dashboard</p>
-                <h3>Visao executiva da operacao</h3>
+          <section class="kpi-band">
+            <article class="kpi-card">
+              <span>Produtos consolidados</span>
+              <strong id="productCount">0</strong>
+            </article>
+            <article class="kpi-card">
+              <span>Estoque total</span>
+              <strong id="totalStock">0</strong>
+            </article>
+            <article class="kpi-card">
+              <span>Vendas no mes atual</span>
+              <strong id="currentMonthSales">0</strong>
+            </article>
+            <article class="kpi-card accent">
+              <span>Projecao do mes</span>
+              <strong id="currentMonthProjection">0</strong>
+            </article>
+          </section>
+
+          <section class="dashboard-summary-bar">
+            <article class="summary-pill">
+              <span>Resumo da base</span>
+              <strong id="dashboardBaseSummary">0 produtos consolidados</strong>
+            </article>
+            <article class="summary-pill">
+              <span>Leitura de estoque</span>
+              <strong id="dashboardStockBreakdown">0 com estoque | 0 sem estoque</strong>
+            </article>
+            <article class="summary-pill">
+              <span>Unidades totais</span>
+              <strong id="dashboardUnitsSummary">0 unidades em estoque</strong>
+            </article>
+          </section>
+
+          <section class="dashboard-grid">
+            <article class="panel panel-command">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Centro de comando</p>
+                  <h3>Estado atual da operacao</h3>
+                </div>
+                <span class="panel-badge">Apoio a decisao</span>
               </div>
-              <p id="monthsLabel" class="section-meta">Ultimos 3 meses ainda nao carregados.</p>
-            </div>
-
-            <section class="metrics-grid">
-              <article class="metric-card">
-                <span>Produtos consolidados</span>
-                <strong id="productCount">0</strong>
-              </article>
-              <article class="metric-card">
-                <span>Estoque total</span>
-                <strong id="totalStock">0</strong>
-              </article>
-              <article class="metric-card">
-                <span>Vendas no mes atual</span>
-                <strong id="currentMonthSales">0</strong>
-              </article>
-              <article class="metric-card accent">
-                <span>Projecao do mes</span>
-                <strong id="currentMonthProjection">0</strong>
-              </article>
-            </section>
-
-            <div class="dashboard-grid">
-              <article class="dashboard-card">
-                <p class="section-kicker">Importacao</p>
-                <h4>Status das fontes</h4>
-                <div class="dashboard-status-list">
-                  <div>
-                    <span>Ultima leitura de estoque</span>
-                    <strong id="dashboardStockStatus">Sem leitura</strong>
-                  </div>
-                  <div>
-                    <span>Ultima leitura de vendas</span>
-                    <strong id="dashboardSalesStatus">Sem leitura</strong>
-                  </div>
-                  <div>
-                    <span>Base persistida</span>
-                    <strong id="dashboardProductBaseCount">0</strong>
-                  </div>
+              <div id="messageBox" class="message-box info">
+                Carregue estoque e vendas para consolidar a leitura operacional.
+              </div>
+              <div class="source-stack source-stack-wide">
+                <div>
+                  <span>Origem do estoque</span>
+                  <strong id="stockStatus">Aguardando</strong>
                 </div>
-              </article>
-
-              <article class="dashboard-card">
-                <p class="section-kicker">Alertas</p>
-                <h4>Resumo de monitoramento</h4>
-                <div class="monitor-summary compact">
-                  <article class="monitor-stat">
-                    <span>Itens monitorados</span>
-                    <strong id="monitoredCount">0</strong>
-                  </article>
-                  <article class="monitor-stat">
-                    <span>Alertas ativos</span>
-                    <strong id="activeAlertCount">0</strong>
-                  </article>
-                  <article class="monitor-stat">
-                    <span>Alertas ignorados</span>
-                    <strong id="ignoredAlertCount">0</strong>
-                  </article>
+                <div>
+                  <span>Origem das vendas</span>
+                  <strong id="salesStatus">Aguardando</strong>
                 </div>
-              </article>
-
-              <article class="dashboard-card">
-                <p class="section-kicker">Estoque</p>
-                <h4>Resumo estrutural</h4>
-                <div class="monitor-summary compact">
-                  <article class="monitor-stat">
-                    <span>SKUs listados</span>
-                    <strong id="stockSkuCount">0</strong>
-                  </article>
-                  <article class="monitor-stat">
-                    <span>Com estoque</span>
-                    <strong id="stockPositiveCount">0</strong>
-                  </article>
-                  <article class="monitor-stat">
-                    <span>Sem estoque</span>
-                    <strong id="stockZeroCount">0</strong>
-                  </article>
+                <div>
+                  <span>Base espelhada</span>
+                  <strong id="dashboardProductBaseCountMirror">0</strong>
                 </div>
-              </article>
+              </div>
+            </article>
 
-              <article class="dashboard-card dashboard-message-card">
-                <p class="section-kicker">Console</p>
-                <h4>Leitura operacional</h4>
-                <div id="messageBox" class="message-box info">
-                  Carregue um ou ambos os relatorios para montar a visao operacional de Zain na Pichau.
+            <article class="panel panel-side">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Resumo de alertas</p>
+                  <h3>Excecoes e cobertura</h3>
                 </div>
-              </article>
+              </div>
+              <div class="stats-stack">
+                <article class="stat-box">
+                  <span>Itens monitorados</span>
+                  <strong id="monitoredCount">0</strong>
+                </article>
+                <article class="stat-box">
+                  <span>Alertas ativos</span>
+                  <strong id="activeAlertCount">0</strong>
+                </article>
+                <article class="stat-box">
+                  <span>Alertas ignorados</span>
+                  <strong id="ignoredAlertCount">0</strong>
+                </article>
+              </div>
+            </article>
 
-              <article class="dashboard-card dashboard-imports-card">
-                <p class="section-kicker">Historico</p>
-                <h4>Importacoes registradas</h4>
-                <div class="table-shell compact-table-shell">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Tipo</th>
-                        <th>Origem</th>
-                        <th>Linhas</th>
-                        <th>Data</th>
-                      </tr>
-                    </thead>
-                    <tbody id="importHistoryBody">
-                      <tr>
-                        <td colspan="4" class="empty-state">Nenhuma importacao registrada ainda.</td>
-                      </tr>
-                    </tbody>
-                  </table>
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Saude do estoque</p>
+                  <h3>Base de estoque</h3>
                 </div>
-              </article>
-            </div>
+              </div>
+              <div class="stats-stack">
+                <article class="stat-box">
+                  <span>SKUs listados</span>
+                  <strong id="stockSkuCount">0</strong>
+                </article>
+                <article class="stat-box">
+                  <span>Com estoque</span>
+                  <strong id="stockPositiveCount">0</strong>
+                </article>
+                <article class="stat-box">
+                  <span>Sem estoque</span>
+                  <strong id="stockZeroCount">0</strong>
+                </article>
+              </div>
+            </article>
+
+            <article class="panel panel-history">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Base consolidada</p>
+                  <h3>Lista de produtos para consulta</h3>
+                </div>
+                <span class="panel-badge">Visao tipo planilha</span>
+              </div>
+              <div class="table-shell compact-table-shell">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Codigo</th>
+                      <th>SKU</th>
+                      <th>Produto</th>
+                      <th>Estoque atual</th>
+                    </tr>
+                  </thead>
+                  <tbody id="consolidatedCatalogBody">
+                    <tr>
+                      <td colspan="4" class="empty-state">Carregue estoque e vendas para montar a lista de consulta.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
           </section>
         </section>
 
         <section class="tab-panel" data-tab-panel="importacao">
-          <section class="import-section">
-          <div class="section-header">
-            <div>
-              <p class="section-kicker">Entrada de dados</p>
-              <h3>Importacao dos relatorios do ERP</h3>
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                  <p class="eyebrow">Entrada de dados</p>
+                  <h3>Importacao dos relatorios do ERP</h3>
+              </div>
+              <p class="panel-meta">Use upload ou cola direta para carregar estoque e faturamento.</p>
             </div>
-            <p class="section-meta">Arquivo ou colagem direta.</p>
-          </div>
 
-          <div class="import-grid">
-            <article class="dock-card">
-              <div class="dock-head">
-                <div>
-                  <p class="dock-kicker">Fonte A</p>
-                  <h4>Estoque atual</h4>
+            <div class="import-grid">
+              <article class="dock-card">
+                <div class="dock-head">
+                  <div>
+                    <p class="eyebrow">Fonte A</p>
+                    <h4>Estoque atual</h4>
+                  </div>
+                  <span id="stockStatusMirror" class="dock-status">Aguardando</span>
                 </div>
-                <span id="stockStatus" class="dock-status">Aguardando</span>
-              </div>
-              <p class="dock-copy">Esperado: codigo, nome do item e saldo de estoque.</p>
-              <input id="stockFile" type="file" accept=".xlsx,.xls,.csv,.txt,.pdf,.html,.htm" />
-              <button id="stockExampleButton" class="button-inline" type="button">Usar exemplo</button>
-              <label for="stockText">Colar relatorio</label>
-              <textarea
-                id="stockText"
-                rows="8"
-                placeholder="codigo,nome,estoque&#10;GB1001,Gabinete A,42"
-              ></textarea>
-            </article>
+                <p class="dock-copy">Padrao principal: aba Estoque com D/E/F/K.</p>
+                <input id="stockFile" type="file" accept=".xlsx,.xls,.csv,.txt,.pdf,.html,.htm" />
+                <button id="stockExampleButton" class="button-inline" type="button">Usar exemplo</button>
+                <label for="stockText">Colar relatorio</label>
+                <textarea
+                  id="stockText"
+                  rows="10"
+                  placeholder="Codigo[TAB]SKU[TAB]Descricao[TAB]... [TAB]Estoque"
+                ></textarea>
+              </article>
 
-            <article class="dock-card">
-              <div class="dock-head">
-                <div>
-                  <p class="dock-kicker">Fonte B</p>
-                  <h4>Faturamento diario</h4>
+              <article class="dock-card">
+                <div class="dock-head">
+                  <div>
+                    <p class="eyebrow">Fonte B</p>
+                    <h4>Faturamento diario</h4>
+                  </div>
+                  <span id="salesStatusMirror" class="dock-status">Aguardando</span>
                 </div>
-                <span id="salesStatus" class="dock-status">Aguardando</span>
-              </div>
-              <p class="dock-copy">Esperado: codigo, nome, data e quantidade faturada.</p>
-              <input id="salesFile" type="file" accept=".xlsx,.xls,.csv,.txt,.pdf,.html,.htm" />
-              <button id="salesExampleButton" class="button-inline" type="button">Usar exemplo</button>
-              <label for="salesText">Colar relatorio</label>
-              <textarea
-                id="salesText"
-                rows="8"
-                placeholder="codigo,nome,data,quantidade&#10;GB1001,Gabinete A,2026-03-05,8"
-              ></textarea>
-            </article>
-          </div>
+                <p class="dock-copy">Esperado: codigo, nome, data e quantidade faturada.</p>
+                <input id="salesFile" type="file" accept=".xlsx,.xls,.csv,.txt,.pdf,.html,.htm" />
+                <button id="salesExampleButton" class="button-inline" type="button">Usar exemplo</button>
+                <label for="salesText">Colar relatorio</label>
+                <textarea
+                  id="salesText"
+                  rows="10"
+                  placeholder="codigo,nome,data,quantidade"
+                ></textarea>
+              </article>
+            </div>
 
-          <div class="import-actions">
-            <button id="processStockButton" class="button-primary" type="button">Processar estoque</button>
-            <button id="processSalesButton" class="button-primary alt" type="button">Processar vendas</button>
-            <button id="processButton" class="button-secondary strong" type="button">Processar ambos</button>
-            <button id="clearButton" class="button-secondary" type="button">Limpar leitura</button>
-          </div>
+            <div class="action-bar">
+              <button id="processStockButton" class="button-primary" type="button">Processar estoque</button>
+              <button id="processSalesButton" class="button-primary alt" type="button">Processar vendas</button>
+              <button id="processButton" class="button-secondary strong" type="button">Processar ambos</button>
+              <button id="clearButton" class="button-secondary" type="button">Limpar leitura</button>
+            </div>
           </section>
         </section>
 
         <section class="tab-panel" data-tab-panel="monitoramento">
-          <section class="results-section control-section">
-            <div class="section-header">
+          <section class="panel">
+            <div class="panel-head">
               <div>
-                <p class="section-kicker">Itens monitorados</p>
-                <h3>Selecao de produtos especificos</h3>
-              </div>
-              <p class="section-meta">Codigo, nome ou SKU. Um item por linha. Pode usar antes ou depois do processamento.</p>
+                  <p class="eyebrow">Lista monitorada</p>
+                  <h3>Monitoramento por codigo, SKU ou descricao</h3>
+                </div>
+              <p class="panel-meta">Aqui voce define o recorte de acompanhamento. A matriz abaixo mostra codigo, SKU, descricao e estoque.</p>
             </div>
 
-            <div class="control-grid">
+            <div class="monitor-layout">
               <article class="control-card">
                 <label for="monitoredInput">Produtos a monitorar</label>
                 <textarea
                   id="monitoredInput"
-                  rows="7"
-                  placeholder="GB1001&#10;GB1004&#10;Gabinete Pichau Pulse Air"
+                  rows="8"
+                  placeholder="38229&#10;SP-FAN-POUTER3&#10;Gabinete Pichau"
                 ></textarea>
-                <p class="helper-copy">
-                  Se vazio, o sistema exibe todos os produtos encontrados nos relatorios.
-                </p>
+                <p class="helper-copy">Digite um codigo, SKU ou descricao por linha. Se vazio, o sistema considera todos os produtos lidos.</p>
+              </article>
+
+              <article class="control-card">
+                <div class="filters">
+                  <label class="filter-field">
+                    <span>Buscar na matriz</span>
+                    <input id="searchInput" type="search" placeholder="Codigo, SKU ou descricao" />
+                  </label>
+                  <label class="filter-field">
+                    <span>Status</span>
+                    <select id="riskFilter">
+                      <option value="all">Todos</option>
+                      <option value="risk">Com risco</option>
+                      <option value="healthy">Sem risco</option>
+                    </select>
+                  </label>
+                  <label class="filter-field">
+                    <span>Ordenacao</span>
+                    <select id="sortSelect">
+                      <option value="projection">Maior projecao</option>
+                      <option value="stock">Menor estoque</option>
+                      <option value="coverage">Menor cobertura</option>
+                      <option value="name">Nome</option>
+                    </select>
+                  </label>
+                </div>
+                <p class="helper-copy">A busca filtra a matriz operacional por codigo, SKU e descricao sem alterar os dados importados.</p>
               </article>
             </div>
           </section>
 
-          <section class="results-section">
-            <div class="section-header compact">
+          <section class="panel">
+            <div class="panel-head">
               <div>
-                <p class="section-kicker">Configuracao por produto</p>
-                <h3>Prazo de reposicao e justificativa de ignorar</h3>
+                  <p class="eyebrow">Lead time</p>
+                  <h3>Prazo de reposicao por item</h3>
               </div>
-              <p class="section-meta">Defina o prazo por item e marque excecoes quando necessario.</p>
             </div>
             <div id="monitoredList" class="monitor-list"></div>
             <p id="monitorEmpty" class="monitor-empty">
@@ -267,37 +363,13 @@
             </p>
           </section>
 
-          <section class="results-section">
-            <div class="section-header">
+          <section class="panel">
+            <div class="panel-head">
               <div>
-                <p class="section-kicker">Consolidacao</p>
-                  <h3>Matriz de estoque, giro e cobertura</h3>
-              </div>
-              <p class="section-meta">Filtro operacional por estoque, giro e risco.</p>
-            </div>
-
-            <div class="filters">
-              <label class="filter-field">
-                <span>Buscar produto</span>
-                <input id="searchInput" type="search" placeholder="Codigo ou nome" />
-              </label>
-              <label class="filter-field">
-                <span>Status</span>
-                <select id="riskFilter">
-                  <option value="all">Todos</option>
-                  <option value="risk">Com risco</option>
-                  <option value="healthy">Sem risco</option>
-                </select>
-              </label>
-              <label class="filter-field">
-                <span>Ordenacao</span>
-                <select id="sortSelect">
-                  <option value="projection">Maior projecao</option>
-                  <option value="stock">Menor estoque</option>
-                  <option value="coverage">Menor cobertura</option>
-                  <option value="name">Nome</option>
-                </select>
-              </label>
+                  <p class="eyebrow">Matriz de decisao</p>
+                  <h3>Matriz operacional</h3>
+                </div>
+              <p class="panel-meta">Use esta tabela para localizar o item pelo codigo, SKU ou descricao e decidir a reposicao.</p>
             </div>
 
             <div class="table-shell">
@@ -316,155 +388,161 @@
         </section>
 
         <section class="tab-panel" data-tab-panel="pedidos">
-        <section class="orders-section">
-          <div class="section-header">
-            <div>
-              <p class="section-kicker">Novos pedidos</p>
-              <h3>Cadastro de PI, OC, PCH e itens multi-linha</h3>
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                  <p class="eyebrow">Fluxo de pedido</p>
+                  <h3>PI, OC, PCH e itens multi-linha</h3>
+              </div>
+              <p class="panel-meta">Fluxo de pedido com divisao, entrada e consolidacao.</p>
             </div>
-            <p class="section-meta">Suporta pedidos divididos e calcula totais automaticamente.</p>
-          </div>
 
-          <div class="orders-layout">
-            <article class="order-card">
-              <div class="order-card-head">
-                <div>
-                  <p class="dock-kicker">Pedido base</p>
-                  <h4>Identificacao e pagamento</h4>
+            <div class="orders-layout">
+              <article class="order-card">
+                <div class="order-card-head">
+                  <div>
+                    <p class="eyebrow">Pedido base</p>
+                    <h4>Identificacao e pagamento</h4>
+                  </div>
+                  <span id="orderSplitBadge" class="dock-status">Base unica</span>
                 </div>
-                <span id="orderSplitBadge" class="dock-status">Base unica</span>
-              </div>
 
-              <div class="order-grid">
-                <label>
-                  Numero da PI
-                  <input id="orderPi" type="text" placeholder="PI-2026-001" />
-                </label>
-                <label>
-                  Numero da OC
-                  <input id="orderOc" type="text" placeholder="OC-4587" />
-                </label>
-                <label>
-                  Numero da PCH
-                  <input id="orderPch" type="text" placeholder="PCH-123" />
-                </label>
-                <label>
-                  Dividir pedido
-                  <select id="orderSplitCount">
-                    <option value="1">1 pedido</option>
-                    <option value="2">2 pedidos</option>
-                    <option value="3">3 pedidos</option>
-                    <option value="4">4 pedidos</option>
-                  </select>
-                </label>
-                <label>
-                  Percentual de entrada
-                  <select id="orderEntryPercent">
-                    <option value="0">0%</option>
-                    <option value="10">10%</option>
-                    <option value="20">20%</option>
-                    <option value="30" selected>30%</option>
-                    <option value="40">40%</option>
-                    <option value="50">50%</option>
-                    <option value="60">60%</option>
-                  </select>
-                </label>
-                <label>
-                  Tipo de pagamento
-                  <select id="orderPaymentType">
-                    <option value="antes-carregamento">Antes do carregamento</option>
-                    <option value="30-apos-embarque">30 dias apos embarque</option>
-                    <option value="60-apos-embarque">60 dias apos embarque</option>
-                    <option value="saldo-documentos">Saldo contra documentos</option>
-                  </select>
-                </label>
-                <label class="inline-toggle">
-                  <input id="orderPaid" type="checkbox" />
-                  Ja foi pago
-                </label>
-                <label>
-                  Data de pagamento
-                  <input id="orderPaymentDate" type="date" />
-                </label>
-              </div>
-
-              <div class="order-summary-strip">
-                <div>
-                  <span>Total do pedido</span>
-                  <strong id="orderTotalValue">US$ 0.00</strong>
+                <div class="order-grid">
+                  <label>
+                    Numero da PI
+                    <input id="orderPi" type="text" placeholder="PI-2026-001" />
+                  </label>
+                  <label>
+                    Numero da OC
+                    <input id="orderOc" type="text" placeholder="OC-4587" />
+                  </label>
+                  <label>
+                    Numero da PCH
+                    <input id="orderPch" type="text" placeholder="PCH-123" />
+                  </label>
+                  <label>
+                    Dividir pedido
+                    <select id="orderSplitCount">
+                      <option value="1">1 pedido</option>
+                      <option value="2">2 pedidos</option>
+                      <option value="3">3 pedidos</option>
+                      <option value="4">4 pedidos</option>
+                    </select>
+                  </label>
+                  <label>
+                    Percentual de entrada
+                    <select id="orderEntryPercent">
+                      <option value="0">0%</option>
+                      <option value="10">10%</option>
+                      <option value="20">20%</option>
+                      <option value="30" selected>30%</option>
+                      <option value="40">40%</option>
+                      <option value="50">50%</option>
+                      <option value="60">60%</option>
+                    </select>
+                  </label>
+                  <label>
+                    Tipo de pagamento
+                    <select id="orderPaymentType">
+                      <option value="antes-carregamento">Antes do carregamento</option>
+                      <option value="30-apos-embarque">30 dias apos embarque</option>
+                      <option value="60-apos-embarque">60 dias apos embarque</option>
+                      <option value="saldo-documentos">Saldo contra documentos</option>
+                    </select>
+                  </label>
+                  <label class="inline-toggle">
+                    <input id="orderPaid" type="checkbox" />
+                    Ja foi pago
+                  </label>
+                  <label>
+                    Data de pagamento
+                    <input id="orderPaymentDate" type="date" />
+                  </label>
                 </div>
-                <div>
-                  <span>Entrada</span>
-                  <strong id="orderEntryValue">US$ 0.00</strong>
+
+                <div class="order-summary-strip">
+                  <div>
+                    <span>Total do pedido</span>
+                    <strong id="orderTotalValue">US$ 0.00</strong>
+                  </div>
+                  <div>
+                    <span>Entrada</span>
+                    <strong id="orderEntryValue">US$ 0.00</strong>
+                  </div>
+                  <div>
+                    <span>Saldo</span>
+                    <strong id="orderBalanceValue">US$ 0.00</strong>
+                  </div>
                 </div>
-                <div>
-                  <span>Balance</span>
-                  <strong id="orderBalanceValue">US$ 0.00</strong>
+
+                <div class="action-bar">
+                  <button id="addOrderItemButton" class="button-inline" type="button">Adicionar item</button>
+                  <button id="saveOrderButton" class="button-primary" type="button">Salvar pedido</button>
+                  <button id="clearOrderButton" class="button-secondary" type="button">Limpar pedido</button>
                 </div>
-              </div>
+              </article>
 
-              <div class="order-actions">
-                <button id="addOrderItemButton" class="button-inline" type="button">Adicionar item</button>
-                <button id="saveOrderButton" class="button-primary" type="button">Salvar pedido</button>
-                <button id="clearOrderButton" class="button-secondary" type="button">Limpar pedido</button>
-              </div>
-            </article>
-
-            <article class="order-card order-items-card">
-              <div class="order-card-head">
-                <div>
-                  <p class="dock-kicker">Itens do pedido</p>
-                  <h4>Produtos, quantidade e preco</h4>
+              <article class="order-card order-items-card">
+                <div class="order-card-head">
+                  <div>
+                    <p class="eyebrow">Itens do pedido</p>
+                    <h4>Produtos, quantidade e preco</h4>
+                  </div>
+                  <span class="dock-status">Multiplos itens</span>
                 </div>
-                <span class="dock-status">Multi-item</span>
-              </div>
 
-              <div class="table-shell order-table-shell">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Tipo</th>
-                      <th>Codigo</th>
-                      <th>Nome</th>
-                      <th>Qtd</th>
-                      <th>US$ unit</th>
-                      <th>Total</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody id="orderItemsBody"></tbody>
-                </table>
-              </div>
-            </article>
-          </div>
-
-          <div class="order-split-preview">
-            <p class="signal-label">Divisao do pedido</p>
-            <strong id="orderSplitPreview">PCH-123-1 / PCH-123-2</strong>
-            <p id="orderSplitHint">O sistema pode gerar pedidos espelhados com sufixo por lote.</p>
-          </div>
-
-          <div class="section-header compact">
-            <div>
-              <p class="section-kicker">Historico de pedidos</p>
-              <h3>Pedidos registrados e consolidados</h3>
+                <div class="table-shell order-table-shell">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Tipo</th>
+                        <th>Codigo</th>
+                        <th>Nome</th>
+                        <th>Qtd</th>
+                        <th>US$ unit</th>
+                        <th>Total</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="orderItemsBody"></tbody>
+                  </table>
+                </div>
+              </article>
             </div>
-            <p class="section-meta">Pedidos salvos ficam disponiveis para consulta no console.</p>
-          </div>
 
-          <div class="table-shell">
-            <table>
-              <thead id="ordersTableHead"></thead>
-              <tbody id="ordersTableBody">
-                <tr>
-                  <td colspan="10" class="empty-state">
-                    Nenhum pedido registrado ainda.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+            <div class="order-split-preview">
+              <p class="eyebrow">Divisao do pedido</p>
+              <strong id="orderSplitPreview">PCH-123-1 / PCH-123-2</strong>
+              <p id="orderSplitHint">O sistema pode gerar pedidos espelhados com sufixo por lote.</p>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+              <p class="eyebrow">Registro de pedidos</p>
+                <h3>Pedidos registrados</h3>
+              </div>
+            </div>
+
+            <div class="table-shell">
+              <table>
+                <thead id="ordersTableHead"></thead>
+                <tbody id="ordersTableBody">
+                  <tr>
+                    <td colspan="10" class="empty-state">Nenhum pedido registrado ainda.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
         </section>
+
+        <section class="sr-only" aria-hidden="true">
+          <input id="supabaseUrlInput" type="text" />
+          <input id="supabaseAnonKeyInput" type="text" />
+          <button id="saveSupabaseConfigButton" type="button">Salvar</button>
+          <button id="clearSupabaseConfigButton" type="button">Limpar</button>
         </section>
       </main>
     </div>
@@ -472,7 +550,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./config.js?v=20260322k"></script>
-    <script src="./app.js?v=20260322k"></script>
+    <script src="./config.js?v=20260322l"></script>
+    <script src="./app.js?v=20260322l"></script>
   </body>
 </html>
