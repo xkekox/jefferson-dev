@@ -177,6 +177,50 @@ function parseDelimitedText(text) {
   });
 }
 
+function parseStockBlockText(text) {
+  const lines = String(text || "")
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length < 5) {
+    return [];
+  }
+
+  const rows = [];
+  for (let index = 0; index <= lines.length - 5; index += 1) {
+    const warehouse = lines[index];
+    const code = lines[index + 1];
+    const sku = lines[index + 2];
+    const name = lines[index + 3];
+    const stock = lines[index + 4];
+
+    const looksLikeBlock =
+      /galpao|galpão|armazem|armazém|deposito|depósito/i.test(warehouse) &&
+      /^\d{4,}$/.test(code) &&
+      /[a-z]/i.test(sku) &&
+      /[a-z]/i.test(name) &&
+      /^-?\d+[.,]?\d*$/.test(String(stock));
+
+    if (!looksLikeBlock) {
+      continue;
+    }
+
+    rows.push({
+      warehouse,
+      code,
+      sku,
+      name,
+      stock
+    });
+
+    index += 4;
+  }
+
+  return rows;
+}
+
 function findColumn(row, aliases) {
   const entries = Object.keys(row);
   const normalizedAliases = aliases.map((alias) => normalizeKey(alias));
@@ -1621,6 +1665,12 @@ async function readUploadedFile(file, aliasesByField, kind) {
     return readSpreadsheetFile(file, aliasesByField, kind);
   }
   const text = await readTextFile(file);
+  if (kind === "estoque") {
+    const blockRows = parseStockBlockText(text);
+    if (blockRows.length) {
+      return blockRows;
+    }
+  }
   return parseDelimitedText(text);
 }
 
@@ -1632,7 +1682,14 @@ async function loadDataset({ fileInput, textArea, aliases, kind }) {
     return null;
   }
 
-  const rows = file ? await readUploadedFile(file, aliases, kind) : parseDelimitedText(pasted);
+  const rows =
+    file
+      ? await readUploadedFile(file, aliases, kind)
+      : kind === "estoque"
+        ? parseStockBlockText(pasted).length
+          ? parseStockBlockText(pasted)
+          : parseDelimitedText(pasted)
+        : parseDelimitedText(pasted);
 
   if (!rows.length) {
     throw new Error(
