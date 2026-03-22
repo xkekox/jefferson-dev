@@ -112,6 +112,12 @@
                 <option value="Todas">Todas</option>
               </select>
             </label>
+            <label class="sector-field">
+              <span>Selecionar subgrupo</span>
+              <select id="subgroupFilter">
+                <option value="Todos">Todos</option>
+              </select>
+            </label>
           </div>
           <div id="sectorChips" class="sector-chips"></div>
         </div>
@@ -180,6 +186,8 @@
                 <th>Produto</th>
                 <th>Marca</th>
                 <th>Setor</th>
+                <th>Grupo</th>
+                <th>Subgrupo</th>
                 <th>Estoque</th>
                 <th>Reserva</th>
                 <th>Disponivel</th>
@@ -195,7 +203,7 @@
             </thead>
             <tbody id="tableBody">
               <tr>
-                <td colspan="16" class="empty-state">Nenhuma leitura consolidada ainda.</td>
+                <td colspan="18" class="empty-state">Nenhuma leitura consolidada ainda.</td>
               </tr>
             </tbody>
           </table>
