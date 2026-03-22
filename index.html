@@ -99,8 +99,8 @@
               <input id="productSearch" type="search" placeholder="Ex.: 38229 ou TGT-LGN-BK" />
             </label>
             <div class="search-actions">
-              <button id="searchButton" class="button button-primary" type="button">Buscar produto</button>
-              <button id="clearSearchButton" class="button button-secondary" type="button">Limpar busca</button>
+              <button id="searchButton" class="button button-primary" type="button" onclick="window.__applySearch?.()">Buscar produto</button>
+              <button id="clearSearchButton" class="button button-secondary" type="button" onclick="window.__clearSearch?.()">Limpar busca</button>
             </div>
             <label class="sector-field">
               <span>Selecionar setor</span>
@@ -220,6 +220,6 @@
       </section>
     </main>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-    <script src="./app.js?v=20260322-zain-sector-2"></script>
+    <script src="./app.js?v=20260322-zain-sector-3"></script>
   </body>
 </html>
