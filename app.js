@@ -412,6 +412,17 @@ async function reloadPersistentData() {
   state.productConfigs = await loadProductConfigsFromSupabase();
   state.savedOrders = await loadOrdersFromSupabase();
   state.importHistory = await loadImportsFromSupabase();
+  const snapshot = loadProcessedSnapshot();
+  const hydrated =
+    hydrateFromImportHistory() ||
+    hydrateFromPersistedProducts() ||
+    (!isSimulatedSnapshot(snapshot) && restoreProcessedSnapshot(snapshot));
+
+  if (hydrated) {
+    saveProcessedSnapshot();
+  } else if (isSimulatedSnapshot(snapshot)) {
+    clearProcessedSnapshot();
+  }
   renderPersistedProductCount();
   renderMonitorList();
   renderTable();
@@ -552,7 +563,7 @@ async function loadImportsFromSupabase() {
 
   const { data, error } = await PERSISTENCE.client
     .from(PERSISTENCE.tables.imports)
-    .select("id, import_type, source_name, row_count, created_at")
+    .select("id, import_type, source_name, row_count, created_at, payload")
     .eq("project_scope", PERSISTENCE.scope)
     .order("created_at", { ascending: false })
     .limit(12);
@@ -567,7 +578,8 @@ async function loadImportsFromSupabase() {
     importType: row.import_type,
     sourceName: row.source_name || "Manual",
     rowCount: Number(row.row_count || 0),
-    createdAt: row.created_at || ""
+    createdAt: row.created_at || "",
+    payload: Array.isArray(row.payload) ? row.payload : []
   }));
 
   writeStorage(STORAGE_KEYS.imports, mapped);
@@ -733,6 +745,7 @@ function emptyOrderItem() {
 
 function emptyOrderDraft() {
   return {
+    editingOrderId: null,
     pi: "",
     oc: "",
     pch: "",
@@ -792,6 +805,121 @@ function saveProcessedSnapshot() {
 
 function loadProcessedSnapshot() {
   return readStorage(STORAGE_KEYS.processedSnapshot, null);
+}
+
+function isSimulatedStatus(label) {
+  const normalized = normalizeKey(label);
+  return normalized.includes("exemplo") || normalized.includes("simulado") || normalized.includes("demo");
+}
+
+function isSimulatedSnapshot(snapshot) {
+  if (!snapshot) {
+    return false;
+  }
+
+  return isSimulatedStatus(snapshot.stockStatus) || isSimulatedStatus(snapshot.salesStatus);
+}
+
+function getLatestImportBatch(kind) {
+  return state.importHistory.find((batch) => batch.importType === kind && Array.isArray(batch.payload) && batch.payload.length);
+}
+
+function hydrateFromImportHistory() {
+  const latestStockBatch = getLatestImportBatch("estoque");
+  const latestSalesBatch = getLatestImportBatch("vendas");
+
+  if (!latestStockBatch && !latestSalesBatch) {
+    return false;
+  }
+
+  state.stockRows = latestStockBatch?.payload || [];
+  state.salesRows = latestSalesBatch?.payload || [];
+  state.stockLoaded = Boolean(state.stockRows.length);
+  state.salesLoaded = Boolean(state.salesRows.length);
+
+  setStatus(
+    refs.stockStatus,
+    latestStockBatch ? `Base persistida: ${latestStockBatch.sourceName || "Manual"}` : "Nao carregado",
+    Boolean(latestStockBatch)
+  );
+  setStatus(
+    refs.salesStatus,
+    latestSalesBatch ? `Base persistida: ${latestSalesBatch.sourceName || "Manual"}` : "Nao carregado",
+    Boolean(latestSalesBatch)
+  );
+
+  if (latestStockBatch) {
+    setDashboardSourceStatus("estoque", buildSourceStatusLabel(latestStockBatch.sourceName, latestStockBatch.rowCount));
+  }
+  if (latestSalesBatch) {
+    setDashboardSourceStatus("vendas", buildSourceStatusLabel(latestSalesBatch.sourceName, latestSalesBatch.rowCount));
+  }
+
+  processData();
+  updateSummary();
+  renderTable();
+  renderMonitorList();
+  return true;
+}
+
+function hydrateFromPersistedProducts() {
+  if (!state.persistedProducts.length) {
+    return false;
+  }
+
+  const monthKeys = getLastThreeMonthKeys(new Date());
+  const currentMonthKey = monthKeys[2];
+
+  state.months = monthKeys;
+  state.monitoredTerms = getMonitoredTerms();
+  state.stockRows = [];
+  state.salesRows = [];
+  state.stockLoaded = false;
+  state.salesLoaded = false;
+  state.processed = state.persistedProducts
+    .filter((product) => matchesMonitoredTerms(product, state.monitoredTerms))
+    .map((product) => {
+      const config = getProductConfig(product.code);
+      const projection = Number(product.projection || 0);
+      const stock = Number(product.stock || 0);
+      const currentSales = Number(product.currentSales || 0);
+      const coverageDays =
+        Number.isFinite(Number(product.coverageDays)) && product.coverageDays !== null
+          ? Number(product.coverageDays)
+          : projection > 0
+            ? (stock / projection) * countBusinessDaysInMonth(new Date())
+            : Number.POSITIVE_INFINITY;
+      const riskLevel = stock === 0 || stock < projection ? "risk" : "healthy";
+      const leadDays = parseNumber(config.leadDays);
+      const reorderAlert =
+        leadDays > 0 &&
+        coverageDays !== Number.POSITIVE_INFINITY &&
+        coverageDays < leadDays &&
+        !config.ignoreAlert;
+
+      return {
+        code: product.code,
+        sku: product.sku || product.code || "",
+        name: product.name || "",
+        stock,
+        monthlySales: Object.fromEntries(monthKeys.map((key) => [key, key === currentMonthKey ? currentSales : 0])),
+        currentSales,
+        projection,
+        coverageDays,
+        riskLevel,
+        leadDays,
+        ignoreAlert: Boolean(config.ignoreAlert),
+        ignoreReason: config.ignoreReason || "",
+        reorderAlert
+      };
+    });
+
+  refs.dashboardStockStatus.textContent = "Base persistida";
+  refs.dashboardSalesStatus.textContent = "Base persistida";
+  updateSummary();
+  renderTable();
+  renderMonitorList();
+  return true;
 }
 
 function clearProcessedSnapshot() {
@@ -1031,7 +1159,12 @@ function renderSavedOrders() {
         <td>${formatPaymentTypeLabel(order.paymentType)}</td>
         <td>${order.paid ? `Pago${order.paymentDate ? ` em ${order.paymentDate}` : ""}` : "Pendente"}</td>
         <td>${(order.splitLabels || []).join("<br />") || "-"}</td>
-        <td><button class="button-inline" type="button" data-delete-order="${order.id}">Excluir</button></td>
+        <td>
+          <div class="inline-actions">
+            <button class="button-inline" type="button" data-edit-order="${order.id}">Editar</button>
+            <button class="button-inline" type="button" data-delete-order="${order.id}">Excluir</button>
+          </div>
+        </td>
       </tr>
     `)
     .join("");
@@ -1142,6 +1275,8 @@ function renderOrderForm() {
   refs.orderPaymentType.value = state.orderDraft.paymentType || "antes-carregamento";
   refs.orderPaid.checked = Boolean(state.orderDraft.paid);
   refs.orderPaymentDate.value = state.orderDraft.paymentDate || "";
+  refs.saveOrderButton.textContent = state.orderDraft.editingOrderId ? "Atualizar pedido" : "Salvar pedido";
+  refs.clearOrderButton.textContent = state.orderDraft.editingOrderId ? "Cancelar edicao" : "Limpar pedido";
 }
 
 function saveCurrentOrder() {
@@ -1160,8 +1295,9 @@ function saveCurrentOrder() {
 
   const totals = computeOrderTotals();
   const splitLabels = getSplitLabels();
+  const orderId = state.orderDraft.editingOrderId || newId("order");
   const order = {
-    id: newId("order"),
+    id: orderId,
     pi: String(state.orderDraft.pi || "").trim(),
     oc: String(state.orderDraft.oc || "").trim(),
     pch: String(state.orderDraft.pch || "").trim(),
@@ -1177,16 +1313,46 @@ function saveCurrentOrder() {
     items
   };
 
-  state.savedOrders = [order, ...state.savedOrders];
+  if (state.orderDraft.editingOrderId) {
+    state.savedOrders = state.savedOrders.map((item) => (item.id === order.id ? order : item));
+  } else {
+    state.savedOrders = [order, ...state.savedOrders];
+  }
   saveOrders();
   void insertOrderToSupabase(order);
   renderSavedOrders();
-  setMessage("success", `Pedido ${order.pch || order.pi || order.id} salvo com sucesso.`);
+  setMessage(
+    "success",
+    `Pedido ${order.pch || order.pi || order.id} ${state.orderDraft.editingOrderId ? "atualizado" : "salvo"} com sucesso.`
+  );
   clearOrderDraft();
 }
 
 function clearOrderDraft() {
   setOrderDraft(emptyOrderDraft());
+}
+
+function editSavedOrder(orderId) {
+  const order = state.savedOrders.find((item) => item.id === orderId);
+  if (!order) {
+    return;
+  }
+
+  setOrderDraft({
+    editingOrderId: order.id,
+    pi: order.pi || "",
+    oc: order.oc || "",
+    pch: order.pch || "",
+    splitCount: String(order.splitCount || 1),
+    entryPercent: String(order.entryPercent || 0),
+    paymentType: order.paymentType || "antes-carregamento",
+    paid: Boolean(order.paid),
+    paymentDate: order.paymentDate || "",
+    items: Array.isArray(order.items) && order.items.length
+      ? order.items.map((item) => ({ ...emptyOrderItem(), ...item, id: item.id || newId("line") }))
+      : [emptyOrderItem()]
+  });
+  setMessage("info", `Pedido ${order.pch || order.pi || order.id} carregado para edicao.`);
 }
 
 function handleOrderFieldChange(event) {
@@ -1210,13 +1376,17 @@ function handleOrderFieldChange(event) {
 }
 
 function handleOrderTableClick(event) {
-  const button = event.target.closest("[data-remove-item],[data-delete-order]");
+  const button = event.target.closest("[data-remove-item],[data-delete-order],[data-edit-order]");
   if (!button) {
     return;
   }
 
   if (button.dataset.removeItem) {
     removeOrderItem(button.dataset.removeItem);
+  }
+
+  if (button.dataset.editOrder) {
+    editSavedOrder(button.dataset.editOrder);
   }
 
   if (button.dataset.deleteOrder) {
@@ -1855,7 +2025,24 @@ async function initializeApp() {
   renderSavedOrders();
   renderImportHistory();
   renderPersistedProductCount();
-  restoreProcessedSnapshot(loadProcessedSnapshot());
+
+  if (hydrateFromImportHistory()) {
+    saveProcessedSnapshot();
+    return;
+  }
+
+  const snapshot = loadProcessedSnapshot();
+  if (!isSimulatedSnapshot(snapshot) && restoreProcessedSnapshot(snapshot)) {
+    return;
+  }
+
+  if (isSimulatedSnapshot(snapshot)) {
+    clearProcessedSnapshot();
+  }
+
+  if (hydrateFromPersistedProducts()) {
+    return;
+  }
 }
 
 void initializeApp();
