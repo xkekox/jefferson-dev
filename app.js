@@ -3,7 +3,8 @@ const state = {
   salesRows: [],
   products: [],
   selectedSector: 'Todos',
-  selectedBrand: 'Todas'
+  selectedBrand: 'Todas',
+  selectedSubgroup: 'Todos'
 };
 
 const elements = {
@@ -26,6 +27,7 @@ const elements = {
   sectorFilter: document.getElementById('sectorFilter'),
   sectorChips: document.getElementById('sectorChips'),
   brandFilter: document.getElementById('brandFilter'),
+  subgroupFilter: document.getElementById('subgroupFilter'),
   brandSummaryBody: document.getElementById('brandSummaryBody'),
   scopeTitle: document.getElementById('scopeTitle'),
   scopeSubtitle: document.getElementById('scopeSubtitle'),
@@ -252,7 +254,7 @@ function parseStockRows(rows) {
         code,
         sku: String(findValue(row, ['sku', 'referencia'])).trim(),
         name: String(findValue(row, ['nome', 'nome do produto', 'descricao', 'produto'])).trim(),
-        brand: String(findValue(row, ['marca', 'fabricante'])).trim(),
+        brand: String(findValue(row, ['marca', 'submarca', 'fabricante', 'linha', 'colecao', 'vendor', 'brand'])).trim(),
         group: String(findValue(row, ['grupo'])).trim(),
         subgroup: String(findValue(row, ['subgrupo'])).trim(),
         currentStock: toNumber(findValue(row, ['estoque atual', 'estoque fisico', 'estoque', 'saldo'])),
@@ -278,7 +280,7 @@ function parseSalesRows(rows) {
       return {
         code,
         name: String(findValue(row, ['descricao', 'produto', 'nome'])).trim(),
-        brand: String(findValue(row, ['marca'])).trim(),
+        brand: String(findValue(row, ['marca', 'submarca', 'fabricante', 'linha', 'colecao', 'vendor', 'brand'])).trim(),
         group: String(findValue(row, ['grupo'])).trim(),
         subgroup: String(findValue(row, ['subgrupo'])).trim(),
         quantity: toNumber(findValue(row, ['quantidade', 'quant.', 'qtd', 'qtdvendida'])),
@@ -412,6 +414,12 @@ function statusClassName(status) {
 }
 
 function inferSector(product) {
+  const groupSource = [product.group, product.subgroup]
+    .join(' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
   const source = [
     product.name,
     product.brand,
@@ -425,6 +433,9 @@ function inferSector(product) {
     .toLowerCase();
 
   for (const rule of SECTOR_RULES) {
+    if (rule.keywords.some((keyword) => groupSource.includes(keyword))) {
+      return rule.name;
+    }
     if (rule.keywords.some((keyword) => source.includes(keyword))) {
       return rule.name;
     }
@@ -436,8 +447,10 @@ function inferSector(product) {
 function getVisibleProducts() {
   return state.products.filter((product) => {
     const sectorMatch = state.selectedSector === 'Todos' || product.sector === state.selectedSector;
-    const brandMatch = state.selectedBrand === 'Todas' || (product.brand || 'Sem marca') === state.selectedBrand;
-    return sectorMatch && brandMatch;
+    const brandMatch = state.selectedBrand === 'Todas' || normalizeBrand(product.brand) === state.selectedBrand;
+    const subgroupValue = product.subgroup || product.group || 'Sem subgrupo';
+    const subgroupMatch = state.selectedSubgroup === 'Todos' || subgroupValue === state.selectedSubgroup;
+    return sectorMatch && brandMatch && subgroupMatch;
   });
 }
 
@@ -458,10 +471,11 @@ function render() {
 
   if (!state.products.length) {
     elements.tableBody.innerHTML =
-      '<tr><td colspan="16" class="empty-state">Nenhuma leitura consolidada ainda.</td></tr>';
+      '<tr><td colspan="18" class="empty-state">Nenhuma leitura consolidada ainda.</td></tr>';
     updateKpis([]);
     renderSectorChips([]);
     renderBrandOptions([]);
+    renderSubgroupOptions([]);
     renderBrandSummary([]);
     return;
   }
@@ -470,11 +484,12 @@ function render() {
   const visibleProducts = getVisibleProducts();
   renderSectorChips(state.products);
   renderBrandOptions(sectorScopedProducts);
+  renderSubgroupOptions(sectorScopedProducts);
   renderBrandSummary(sectorScopedProducts, visibleProducts);
 
   if (!visibleProducts.length) {
     elements.tableBody.innerHTML =
-      '<tr><td colspan="16" class="empty-state">Nenhum produto encontrado para o setor selecionado.</td></tr>';
+      '<tr><td colspan="18" class="empty-state">Nenhum produto encontrado para o filtro selecionado.</td></tr>';
     updateKpis([]);
     return;
   }
@@ -488,6 +503,8 @@ function render() {
           <td>${escapeHtml(product.name)}</td>
           <td>${escapeHtml(product.brand)}</td>
           <td>${escapeHtml(product.sector)}</td>
+          <td>${escapeHtml(product.group)}</td>
+          <td>${escapeHtml(product.subgroup)}</td>
           <td>${formatNumber(product.currentStock)}</td>
           <td>${formatNumber(product.reservedStock)}</td>
           <td>${formatNumber(product.availableStock)}</td>
@@ -522,7 +539,7 @@ function renderSectorChips(products) {
 
 function renderBrandOptions(products) {
   const brands = Array.from(
-    new Set(products.map((product) => product.brand || 'Sem marca').filter(Boolean))
+    new Set(products.map((product) => normalizeBrand(product.brand)).filter(Boolean))
   ).sort((left, right) => left.localeCompare(right, 'pt-BR'));
 
   if (state.selectedBrand !== 'Todas' && !brands.includes(state.selectedBrand)) {
@@ -535,6 +552,26 @@ function renderBrandOptions(products) {
   elements.brandFilter.value = state.selectedBrand;
 }
 
+function normalizeBrand(value) {
+  const brand = String(value || '').trim();
+  return brand || 'Sem marca';
+}
+
+function renderSubgroupOptions(products) {
+  const subgroups = Array.from(
+    new Set(products.map((product) => product.subgroup || product.group || 'Sem subgrupo').filter(Boolean))
+  ).sort((left, right) => left.localeCompare(right, 'pt-BR'));
+
+  if (state.selectedSubgroup !== 'Todos' && !subgroups.includes(state.selectedSubgroup)) {
+    state.selectedSubgroup = 'Todos';
+  }
+
+  elements.subgroupFilter.innerHTML = ['<option value="Todos">Todos</option>']
+    .concat(subgroups.map((subgroup) => `<option value="${escapeHtml(subgroup)}">${escapeHtml(subgroup)}</option>`))
+    .join('');
+  elements.subgroupFilter.value = state.selectedSubgroup;
+}
+
 function renderBrandSummary(sectorScopedProducts, visibleProducts) {
   if (!sectorScopedProducts.length) {
     elements.brandSummaryBody.innerHTML =
@@ -545,7 +582,7 @@ function renderBrandSummary(sectorScopedProducts, visibleProducts) {
 
   const brandMap = new Map();
   sectorScopedProducts.forEach((product) => {
-    const brand = product.brand || 'Sem marca';
+    const brand = normalizeBrand(product.brand);
     const current = brandMap.get(brand) || {
       brand,
       products: 0,
@@ -580,8 +617,9 @@ function renderBrandSummary(sectorScopedProducts, visibleProducts) {
 function updateScopeSummary(products, brandCount = 0) {
   const sectorLabel = state.selectedSector === 'Todos' ? 'Todos os produtos' : state.selectedSector;
   const brandLabel = state.selectedBrand === 'Todas' ? 'todas as marcas' : state.selectedBrand;
+  const subgroupLabel = state.selectedSubgroup === 'Todos' ? 'todos os subgrupos' : state.selectedSubgroup;
   elements.scopeTitle.textContent = `Totais de ${sectorLabel}`;
-  elements.scopeSubtitle.textContent = `Recorte atual: ${sectorLabel} | Marca: ${brandLabel}`;
+  elements.scopeSubtitle.textContent = `Recorte atual: ${sectorLabel} | Marca: ${brandLabel} | Subgrupo: ${subgroupLabel}`;
   elements.scopeStock.textContent = formatNumber(products.reduce((sum, product) => sum + product.currentStock, 0));
   elements.scopeCurrentSales.textContent = formatNumber(products.reduce((sum, product) => sum + product.monthlySales[2], 0));
   elements.scopeProjection.textContent = formatNumber(products.reduce((sum, product) => sum + product.projection, 0));
@@ -670,10 +708,15 @@ elements.clearButton.addEventListener('click', clearAll);
 elements.sectorFilter.addEventListener('change', (event) => {
   state.selectedSector = event.target.value;
   state.selectedBrand = 'Todas';
+  state.selectedSubgroup = 'Todos';
   render();
 });
 elements.brandFilter.addEventListener('change', (event) => {
   state.selectedBrand = event.target.value;
+  render();
+});
+elements.subgroupFilter.addEventListener('change', (event) => {
+  state.selectedSubgroup = event.target.value;
   render();
 });
 
