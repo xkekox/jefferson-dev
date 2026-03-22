@@ -358,6 +358,7 @@ function parseStockRows(rows) {
         averageSalesHint: toNumber(findValue(row, ['media de venda 3 meses', 'media de venda', 'media 3 meses']))
       };
     })
+    .filter(Boolean)
     .map((row) => ({
       ...row,
       brand: resolveBrand(
