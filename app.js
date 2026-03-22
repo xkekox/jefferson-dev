@@ -35,6 +35,9 @@ const refs = {
   monitoredCount: document.getElementById("monitoredCount"),
   activeAlertCount: document.getElementById("activeAlertCount"),
   ignoredAlertCount: document.getElementById("ignoredAlertCount"),
+  stockSkuCount: document.getElementById("stockSkuCount"),
+  stockPositiveCount: document.getElementById("stockPositiveCount"),
+  stockZeroCount: document.getElementById("stockZeroCount"),
   importHistoryBody: document.getElementById("importHistoryBody"),
   tableHead: document.getElementById("tableHead"),
   tableBody: document.getElementById("tableBody"),
@@ -649,6 +652,7 @@ async function reloadPersistentData() {
   state.productConfigs = await loadProductConfigsFromSupabase();
   state.savedOrders = await loadOrdersFromSupabase();
   state.importHistory = await loadImportsFromSupabase();
+  updateStockHealthSummary();
   renderPersistedProductCount();
   renderMonitorList();
   renderTable();
@@ -1957,6 +1961,17 @@ function updateSummary() {
   renderMonitorList();
 }
 
+function updateStockHealthSummary() {
+  const normalizedRows = state.stockRows.filter((row) => String(row.code || "").trim());
+  const totalSkus = normalizedRows.length;
+  const positiveSkus = normalizedRows.filter((row) => parseNumber(row.stock) > 0).length;
+  const zeroSkus = normalizedRows.filter((row) => parseNumber(row.stock) <= 0).length;
+
+  refs.stockSkuCount.textContent = formatInteger(totalSkus);
+  refs.stockPositiveCount.textContent = formatInteger(positiveSkus);
+  refs.stockZeroCount.textContent = formatInteger(zeroSkus);
+}
+
 function buildTableHead() {
   refs.tableHead.innerHTML = `
     <tr>
@@ -2136,6 +2151,9 @@ function resetState(options = {}) {
   refs.dashboardStockStatus.textContent = "Sem leitura";
   refs.dashboardSalesStatus.textContent = "Sem leitura";
   refs.dashboardProductBaseCount.textContent = "0";
+  refs.stockSkuCount.textContent = "0";
+  refs.stockPositiveCount.textContent = "0";
+  refs.stockZeroCount.textContent = "0";
   setMessage("info", "Carregue um ou ambos os relatorios para montar a visao operacional de Zain na Pichau.");
 
   refs.productCount.textContent = "0";
@@ -2215,6 +2233,7 @@ async function handleProcess(mode) {
     state.salesRows = salesRows || [];
     state.stockLoaded = Boolean(stockRows);
     state.salesLoaded = Boolean(salesRows);
+    updateStockHealthSummary();
 
     setStatus(refs.stockStatus, stockRows ? "Carregado" : "Nao carregado", Boolean(stockRows));
     setStatus(refs.salesStatus, salesRows ? "Carregado" : "Nao carregado", Boolean(salesRows));
