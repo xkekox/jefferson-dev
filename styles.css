@@ -352,6 +352,7 @@ th {
   color: #d7e8ff;
 }
 
+.panel-badge.is-ready,
 .dock-status.is-ready {
   border-color: rgba(76, 204, 145, 0.2);
   background: rgba(76, 204, 145, 0.1);
@@ -392,6 +393,7 @@ th {
 
 .dashboard-grid,
 .import-grid,
+.sheet-input-grid,
 .orders-layout,
 .monitor-layout {
   display: grid;
@@ -490,6 +492,18 @@ textarea {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 18px;
+}
+
+.debug-box {
+  margin: 16px 0 0;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line-soft);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-soft);
+  font: 0.78rem/1.5 "IBM Plex Sans", sans-serif;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 button {
